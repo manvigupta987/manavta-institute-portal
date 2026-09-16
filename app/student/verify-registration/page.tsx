@@ -8,12 +8,14 @@ interface StudentData {
   father_name: string;
   course_name: string;
   admission_date: string;
+  dob: string;
   institute_name: string;
   photo_url?: string;
 }
 
 export default function VerifyRegistrationPage() {
-  const [enrollmentNo, setEnrollmentNo] = useState('');
+  const [studentName, setStudentName] = useState('');
+  const [dob, setDob] = useState('');
   const [loading, setLoading] = useState(false);
   const [student, setStudent] = useState<StudentData | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
@@ -21,7 +23,10 @@ export default function VerifyRegistrationPage() {
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!enrollmentNo.trim()) return;
+    if (!studentName.trim() || !dob.trim()) {
+      setErrorMsg('Please enter both Student Name and Date of Birth.');
+      return;
+    }
 
     setLoading(true);
     setErrorMsg('');
@@ -32,7 +37,10 @@ export default function VerifyRegistrationPage() {
       const res = await fetch('/api/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enrollmentNo: enrollmentNo.trim() }),
+        body: JSON.stringify({ 
+          studentName: studentName.trim(),
+          dob: dob.trim()
+        }),
       });
 
       const data = await res.json();
@@ -40,7 +48,7 @@ export default function VerifyRegistrationPage() {
       if (res.ok && data.student) {
         setStudent(data.student);
       } else {
-        setErrorMsg(data.message || 'Enrollment Number not found in system.');
+        setErrorMsg(data.message || 'No matching student record found. Please check Name & DOB.');
       }
     } catch (err) {
       console.error(err);
@@ -57,7 +65,7 @@ export default function VerifyRegistrationPage() {
   return (
     <div className="min-h-screen bg-white text-gray-900 py-10 px-4 font-sans flex flex-col items-center">
       
-      {/* 🖨️ PRINT ONLY STYLES (Print dabane par sirf ID Card hi print hoga) */}
+      {/* 🖨️ PRINT ONLY STYLES */}
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
           body * {
@@ -83,22 +91,30 @@ export default function VerifyRegistrationPage() {
         }
       `}} />
 
-      {/* Main Wrapper */}
+      {/* Main Container */}
       <div className="w-full max-w-2xl">
         
-        {/* Title */}
+        {/* Title Banner */}
         <h1 className="text-2xl sm:text-3xl font-bold text-center mb-6 text-black no-print">
-          View your Registration Informtion
+          View your Registration Information
         </h1>
 
-        {/* Search Input Bar */}
+        {/* Search Input Bar (Student Name + DOB) */}
         <form onSubmit={handleSearch} className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-8 no-print">
           <input
             type="text"
-            value={enrollmentNo}
-            onChange={(e) => setEnrollmentNo(e.target.value)}
-            placeholder="Enter Enrollment No"
-            className="w-full sm:w-64 px-4 py-2 text-base border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+            value={studentName}
+            onChange={(e) => setStudentName(e.target.value)}
+            placeholder="Enter Student Name"
+            className="w-full sm:w-56 px-4 py-2 text-base border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+            required
+          />
+          <input
+            type="date"
+            value={dob}
+            onChange={(e) => setDob(e.target.value)}
+            placeholder="Select DOB"
+            className="w-full sm:w-48 px-4 py-2 text-base border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
             required
           />
           <button
@@ -150,10 +166,10 @@ export default function VerifyRegistrationPage() {
               />
             </div>
 
-            {/* Content Grid (Details Left, Photo Right) */}
+            {/* Content Details Grid */}
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
               
-              {/* Left Side: Student Details */}
+              {/* Left Details */}
               <div className="md:col-span-8 space-y-3.5 text-sm sm:text-base">
                 <div className="grid grid-cols-12">
                   <span className="col-span-5 font-bold text-gray-900">Enrollment No:</span>
@@ -181,10 +197,8 @@ export default function VerifyRegistrationPage() {
                 </div>
               </div>
 
-              {/* Right Side: Photo + Authorised Signatory */}
+              {/* Right Photo & Authorised Signatory */}
               <div className="md:col-span-4 flex flex-col items-center justify-center pt-1 md:pt-0">
-                
-                {/* Student Photo */}
                 <div className="w-28 h-32 border border-gray-400 p-0.5 bg-white shadow-sm overflow-hidden mb-3">
                   <img 
                     src={student.photo_url || '/student-placeholder.jpg'} 
@@ -193,7 +207,6 @@ export default function VerifyRegistrationPage() {
                   />
                 </div>
 
-                {/* Authorised Signatory Signature Image */}
                 <div className="text-center pt-2 border-t border-gray-300 w-full flex flex-col items-center">
                   <img 
                     src="/authorised-signature.png" 
@@ -203,7 +216,6 @@ export default function VerifyRegistrationPage() {
                   <span className="text-xs font-semibold text-gray-700">Authorised Signatory</span>
                   <span className="text-[10px] text-gray-500">Manavta Institute</span>
                 </div>
-
               </div>
 
             </div>
