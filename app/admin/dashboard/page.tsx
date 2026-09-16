@@ -3,6 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
+// =========================================================================
+// TYPES
+// =========================================================================
 interface StudentRecord {
   id?: string;
   enrollment_no: string;
@@ -19,7 +22,8 @@ interface StudentRecord {
   aadhar_no?: string;
   qualification?: string;
   address?: string;
-  institute_name: string;
+  institute_name?: string;
+  created_at?: string;
 }
 
 interface SubjectMarks {
@@ -30,6 +34,7 @@ interface SubjectMarks {
 }
 
 interface MarksheetRecord {
+  id?: string;
   enrollment_no: string;
   roll_no?: string;
   student_name: string;
@@ -49,8 +54,9 @@ export default function AdminDashboardPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'admission' | 'students_list' | 'marksheets'>('admission');
   const [admissionSubTab, setAdmissionSubTab] = useState<'single' | 'excel'>('single');
+  const [marksheetSubTab, setMarksheetSubTab] = useState<'single' | 'excel'>('single');
 
-  // Verify Admin Session
+  // Authentication Guard
   useEffect(() => {
     const session = localStorage.getItem('admin_session');
     if (!session) {
@@ -59,7 +65,7 @@ export default function AdminDashboardPage() {
   }, [router]);
 
   // =========================================================================
-  // STATE 1: SINGLE STUDENT ADMISSION FORM (ALL compulsory except alt_mobile_no)
+  // STATE 1: SINGLE STUDENT ADMISSION FORM
   // =========================================================================
   const [singleStudent, setSingleStudent] = useState<StudentRecord>({
     enrollment_no: '',
@@ -68,17 +74,16 @@ export default function AdminDashboardPage() {
     father_name: '',
     mother_name: '',
     course_name: 'CPAC',
-    admission_date: '',
-    dob: '',
+    admission_date: '11.04.2025',
+    dob: '15.08.2005',
     mobile_no: '',
-    alt_mobile_no: '', // OPTIONAL
+    alt_mobile_no: '',
     photo_url: '',
     aadhar_no: '',
-    qualification: '',
+    qualification: '12th Pass',
     address: '',
     institute_name: 'MITM'
   });
-
   const [admissionStatus, setAdmissionStatus] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
   const [submittingStudent, setSubmittingStudent] = useState(false);
 
@@ -86,34 +91,6 @@ export default function AdminDashboardPage() {
     e.preventDefault();
     setSubmittingStudent(true);
     setAdmissionStatus(null);
-
-    // Validation Check: All fields EXCEPT alt_mobile_no are mandatory
-    const requiredFields = [
-      { field: singleStudent.enrollment_no, label: 'Enrollment No' },
-      { field: singleStudent.roll_no, label: 'Roll No' },
-      { field: singleStudent.student_name, label: 'Student Name' },
-      { field: singleStudent.father_name, label: "Father's Name" },
-      { field: singleStudent.mother_name, label: "Mother's Name" },
-      { field: singleStudent.course_name, label: 'Course Name' },
-      { field: singleStudent.admission_date, label: 'Admission Date' },
-      { field: singleStudent.dob, label: 'Date of Birth (DOB)' },
-      { field: singleStudent.mobile_no, label: 'Mobile No' },
-      { field: singleStudent.photo_url, label: 'Student Photo URL' },
-      { field: singleStudent.aadhar_no, label: 'Aadhar Card No' },
-      { field: singleStudent.qualification, label: 'Qualification' },
-      { field: singleStudent.address, label: 'Address' },
-      { field: singleStudent.institute_name, label: 'Institute Name' },
-    ];
-
-    const missing = requiredFields.filter((item) => !item.field || !item.field.trim());
-    if (missing.length > 0) {
-      setAdmissionStatus({
-        type: 'error',
-        msg: `Compulsory field missing: Please enter ${missing.map((m) => m.label).join(', ')}.`
-      });
-      setSubmittingStudent(false);
-      return;
-    }
 
     try {
       const res = await fetch('/api/admin/students', {
@@ -125,23 +102,17 @@ export default function AdminDashboardPage() {
       const data = await res.json();
       if (res.ok) {
         setAdmissionStatus({ type: 'success', msg: 'Student admission details saved successfully!' });
-        // Reset compulsory fields
+        // Reset key fields
         setSingleStudent({
+          ...singleStudent,
           enrollment_no: '',
           roll_no: '',
           student_name: '',
           father_name: '',
           mother_name: '',
-          course_name: 'CPAC',
-          admission_date: '',
-          dob: '',
           mobile_no: '',
-          alt_mobile_no: '',
-          photo_url: '',
           aadhar_no: '',
-          qualification: '',
-          address: '',
-          institute_name: 'MITM'
+          address: ''
         });
       } else {
         setAdmissionStatus({ type: 'error', msg: data.message || 'Failed to save student record.' });
@@ -205,15 +176,14 @@ export default function AdminDashboardPage() {
     roll_no: true,
     student_name: true,
     father_name: true,
-    mother_name: true,
+    mother_name: false,
     course_name: true,
     admission_date: true,
-    dob: true,
+    dob: false,
     mobile_no: true,
-    alt_mobile_no: false,
-    aadhar_no: true,
-    qualification: true,
-    address: true,
+    aadhar_no: false,
+    qualification: false,
+    address: false,
     photo: true,
   });
 
@@ -262,7 +232,7 @@ export default function AdminDashboardPage() {
     if (filteredStudents.length === 0) return;
     const headers = [
       'Enrollment No', 'Roll No', 'Student Name', 'Father Name', 'Mother Name',
-      'Course', 'Admission Date', 'DOB', 'Mobile No', 'Alt Mobile No', 'Aadhar No', 'Qualification', 'Address'
+      'Course', 'Admission Date', 'DOB', 'Mobile No', 'Aadhar No', 'Address'
     ];
 
     const csvRows = [headers.join(',')];
@@ -271,7 +241,7 @@ export default function AdminDashboardPage() {
         `"${s.enrollment_no}"`, `"${s.roll_no || ''}"`, `"${s.student_name}"`,
         `"${s.father_name}"`, `"${s.mother_name || ''}"`, `"${s.course_name}"`,
         `"${s.admission_date}"`, `"${s.dob || ''}"`, `"${s.mobile_no || ''}"`,
-        `"${s.alt_mobile_no || ''}"`, `"${s.aadhar_no || ''}"`, `"${s.qualification || ''}"`, `"${(s.address || '').replace(/"/g, '""')}"`
+        `"${s.aadhar_no || ''}"`, `"${(s.address || '').replace(/"/g, '""')}"`
       ];
       csvRows.push(row.join(','));
     });
@@ -449,12 +419,7 @@ export default function AdminDashboardPage() {
             {/* SUB-TAB A: SINGLE STUDENT ADMISSION FORM */}
             {admissionSubTab === 'single' && (
               <form onSubmit={handleStudentFormSubmit} className="space-y-6">
-                <div className="flex items-center justify-between border-b pb-2">
-                  <h3 className="text-lg font-bold text-slate-800">New Student Registration & Admission Form</h3>
-                  <span className="text-xs font-semibold text-red-600 bg-red-50 px-3 py-1 rounded-full border border-red-200">
-                    * All fields compulsory except Alternate Mobile No
-                  </span>
-                </div>
+                <h3 className="text-lg font-bold text-slate-800 border-b pb-2">New Student Registration & Admission Form</h3>
 
                 {admissionStatus && (
                   <div className={`p-4 rounded border text-sm font-medium ${
@@ -465,236 +430,167 @@ export default function AdminDashboardPage() {
                 )}
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  
-                  {/* 1. Enrollment No */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
-                      Enrollment No <span className="text-red-500">*</span>
-                    </label>
+                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Enrollment No *</label>
                     <input
                       type="text"
                       value={singleStudent.enrollment_no}
                       onChange={(e) => setSingleStudent({ ...singleStudent, enrollment_no: e.target.value })}
                       placeholder="e.g. 1039954625"
-                      className="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-sky-500"
+                      className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-sky-500"
                       required
                     />
                   </div>
-
-                  {/* 2. Roll No */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
-                      Roll No <span className="text-red-500">*</span>
-                    </label>
+                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Roll No</label>
                     <input
                       type="text"
                       value={singleStudent.roll_no}
                       onChange={(e) => setSingleStudent({ ...singleStudent, roll_no: e.target.value })}
                       placeholder="e.g. 2026/CPAC/041"
-                      className="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-sky-500"
-                      required
+                      className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-sky-500"
                     />
                   </div>
-
-                  {/* 3. Course Name */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
-                      Course Name <span className="text-red-500">*</span>
-                    </label>
+                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Course Name *</label>
                     <input
                       type="text"
                       value={singleStudent.course_name}
                       onChange={(e) => setSingleStudent({ ...singleStudent, course_name: e.target.value })}
                       placeholder="e.g. CPAC"
-                      className="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-sky-500"
+                      className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-sky-500"
                       required
                     />
                   </div>
-
-                  {/* 4. Student Name */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
-                      Student Name <span className="text-red-500">*</span>
-                    </label>
+                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Student Name *</label>
                     <input
                       type="text"
                       value={singleStudent.student_name}
                       onChange={(e) => setSingleStudent({ ...singleStudent, student_name: e.target.value })}
                       placeholder="e.g. NISHA"
-                      className="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-sky-500"
+                      className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-sky-500"
                       required
                     />
                   </div>
-
-                  {/* 5. Father's Name */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
-                      Father's Name <span className="text-red-500">*</span>
-                    </label>
+                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Father&apos;s Name *</label>
                     <input
                       type="text"
                       value={singleStudent.father_name}
                       onChange={(e) => setSingleStudent({ ...singleStudent, father_name: e.target.value })}
                       placeholder="e.g. RANINDRA SINGH"
-                      className="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-sky-500"
+                      className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-sky-500"
                       required
                     />
                   </div>
-
-                  {/* 6. Mother's Name */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
-                      Mother's Name <span className="text-red-500">*</span>
-                    </label>
+                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Mother&apos;s Name</label>
                     <input
                       type="text"
                       value={singleStudent.mother_name}
                       onChange={(e) => setSingleStudent({ ...singleStudent, mother_name: e.target.value })}
                       placeholder="e.g. SUNITA DEVI"
-                      className="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-sky-500"
-                      required
+                      className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-sky-500"
                     />
                   </div>
-
-                  {/* 7. Admission Date */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
-                      Admission Date <span className="text-red-500">*</span>
-                    </label>
+                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Admission Date *</label>
                     <input
                       type="text"
                       value={singleStudent.admission_date}
                       onChange={(e) => setSingleStudent({ ...singleStudent, admission_date: e.target.value })}
                       placeholder="e.g. 11.04.2025"
-                      className="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-sky-500"
+                      className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-sky-500"
                       required
                     />
                   </div>
-
-                  {/* 8. Date of Birth (DOB) */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
-                      Date of Birth (DOB) <span className="text-red-500">*</span>
-                    </label>
+                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Date of Birth (DOB)</label>
                     <input
-                      type="date"
+                      type="text"
                       value={singleStudent.dob}
                       onChange={(e) => setSingleStudent({ ...singleStudent, dob: e.target.value })}
-                      className="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-sky-500"
-                      required
+                      placeholder="e.g. 15.08.2005"
+                      className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-sky-500"
                     />
                   </div>
-
-                  {/* 9. Mobile No */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
-                      Mobile No <span className="text-red-500">*</span>
-                    </label>
+                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Mobile No</label>
                     <input
-                      type="tel"
+                      type="text"
                       value={singleStudent.mobile_no}
                       onChange={(e) => setSingleStudent({ ...singleStudent, mobile_no: e.target.value })}
                       placeholder="e.g. 9876543210"
-                      className="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-sky-500"
-                      required
+                      className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-sky-500"
                     />
                   </div>
-
-                  {/* 10. Alternate Mobile No (OPTIONAL FIELD) */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">
-                      Alternate Mobile No <span className="text-slate-400 font-normal">(Optional)</span>
-                    </label>
+                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Alternate Mobile No</label>
                     <input
-                      type="tel"
+                      type="text"
                       value={singleStudent.alt_mobile_no}
                       onChange={(e) => setSingleStudent({ ...singleStudent, alt_mobile_no: e.target.value })}
-                      placeholder="e.g. 9123456789 (Optional)"
-                      className="w-full px-3 py-2 border border-slate-200 rounded text-sm focus:ring-2 focus:ring-sky-500 bg-slate-50"
+                      placeholder="e.g. 9123456789"
+                      className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-sky-500"
                     />
                   </div>
-
-                  {/* 11. Aadhar Card No */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
-                      Aadhar Card No <span className="text-red-500">*</span>
-                    </label>
+                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Aadhar Card No</label>
                     <input
                       type="text"
                       value={singleStudent.aadhar_no}
                       onChange={(e) => setSingleStudent({ ...singleStudent, aadhar_no: e.target.value })}
                       placeholder="e.g. 1234-5678-9012"
-                      className="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-sky-500"
-                      required
+                      className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-sky-500"
                     />
                   </div>
-
-                  {/* 12. Qualification */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
-                      Qualification <span className="text-red-500">*</span>
-                    </label>
+                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Qualification</label>
                     <input
                       type="text"
                       value={singleStudent.qualification}
                       onChange={(e) => setSingleStudent({ ...singleStudent, qualification: e.target.value })}
                       placeholder="e.g. 12th Pass / Graduate"
-                      className="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-sky-500"
-                      required
+                      className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-sky-500"
                     />
                   </div>
-
-                  {/* 13. Student Photo URL */}
                   <div className="md:col-span-2">
-                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
-                      Student Photo URL <span className="text-red-500">*</span>
-                    </label>
+                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Student Photo URL</label>
                     <input
                       type="text"
                       value={singleStudent.photo_url}
                       onChange={(e) => setSingleStudent({ ...singleStudent, photo_url: e.target.value })}
-                      placeholder="Paste image URL (e.g. https://portal.manavtainstitute.com/student-photo.jpg)"
-                      className="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-sky-500"
-                      required
+                      placeholder="Paste image link or URL (e.g. https://portal.../nisha.jpg)"
+                      className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-sky-500"
                     />
                   </div>
-
-                  {/* 14. Institute Name */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
-                      Institute Name <span className="text-red-500">*</span>
-                    </label>
+                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Institute Name</label>
                     <input
                       type="text"
                       value={singleStudent.institute_name}
                       onChange={(e) => setSingleStudent({ ...singleStudent, institute_name: e.target.value })}
-                      className="w-full px-3 py-2 border border-slate-300 rounded text-sm bg-slate-50"
-                      required
+                      className="w-full px-3 py-2 border rounded text-sm bg-slate-50"
                     />
                   </div>
-
-                  {/* 15. Full Address */}
                   <div className="md:col-span-3">
-                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
-                      Full Address <span className="text-red-500">*</span>
-                    </label>
+                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Full Address</label>
                     <textarea
                       rows={2}
                       value={singleStudent.address}
                       onChange={(e) => setSingleStudent({ ...singleStudent, address: e.target.value })}
-                      placeholder="Enter full residential address"
-                      className="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-sky-500"
-                      required
+                      placeholder="Enter student residential address"
+                      className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-sky-500"
                     />
                   </div>
-
                 </div>
 
                 <div className="pt-4 flex justify-end">
                   <button
                     type="submit"
                     disabled={submittingStudent}
-                    className="px-8 py-3 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded shadow transition disabled:opacity-50"
+                    className="px-8 py-3 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded shadow transition"
                   >
                     {submittingStudent ? 'Saving Student Record...' : 'Save Student Admission Details'}
                   </button>
@@ -756,116 +652,96 @@ export default function AdminDashboardPage() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="🔍 Search Name, Enrollment No, Course..."
-                  className="w-full px-4 py-2 border rounded text-sm focus:ring-2 focus:ring-sky-500"
+                  placeholder="🔍 Search by Name, Enrollment, Course..."
+                  className="w-full px-4 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-sky-500 shadow-sm"
                 />
               </div>
 
-              {/* Controls */}
-              <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
+              {/* Action Buttons */}
+              <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
                 <button
                   onClick={exportToExcel}
                   className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded shadow transition flex items-center gap-1.5"
                 >
-                  📥 Export CSV / Excel
+                  📊 Download Excel / CSV
                 </button>
                 <button
                   onClick={() => window.print()}
                   className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded shadow transition flex items-center gap-1.5"
                 >
-                  🖨️ Print PDF
+                  🖨️ Print / Save PDF
                 </button>
               </div>
 
             </div>
 
-            {/* Column Toggle Checklist */}
-            <div className="bg-slate-50 p-4 rounded border text-xs space-y-2">
-              <span className="font-bold text-slate-700 block mb-1">👁️ Column Show/Hide Toggles:</span>
+            {/* Column Visibility Toggles */}
+            <div className="bg-slate-50 p-3 rounded border border-slate-200 text-xs">
+              <span className="font-bold text-slate-700 block mb-2">👁️ Column Visibility Toggles:</span>
               <div className="flex flex-wrap gap-3">
                 {Object.keys(visibleCols).map((col) => (
-                  <label key={col} className="flex items-center gap-1.5 capitalize cursor-pointer text-slate-700 select-none">
+                  <label key={col} className="flex items-center gap-1 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={visibleCols[col as keyof typeof visibleCols]}
+                      checked={(visibleCols as any)[col]}
                       onChange={(e) => setVisibleCols({ ...visibleCols, [col]: e.target.checked })}
                       className="rounded text-sky-600 focus:ring-sky-500"
                     />
-                    {col.replace('_', ' ')}
+                    <span className="capitalize">{col.replace('_', ' ')}</span>
                   </label>
                 ))}
               </div>
             </div>
 
-            {/* Data Table */}
-            <div className="overflow-x-auto border rounded-lg shadow-sm">
-              <table className="w-full text-left text-xs text-slate-700 border-collapse">
-                <thead className="bg-slate-800 text-white uppercase text-[11px] tracking-wider">
+            {/* Students Data Table */}
+            <div className="overflow-x-auto border border-slate-200 rounded-lg shadow-sm">
+              <table className="w-full text-left text-xs sm:text-sm text-slate-800">
+                <thead className="bg-slate-900 text-white font-semibold">
                   <tr>
-                    {visibleCols.enrollment_no && (
-                      <th 
-                        onClick={() => { setSortField('enrollment_no'); setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'); }}
-                        className="px-4 py-3 cursor-pointer hover:bg-slate-700 select-none"
-                      >
-                        Enrollment No ↕
-                      </th>
-                    )}
-                    {visibleCols.roll_no && <th className="px-4 py-3">Roll No</th>}
-                    {visibleCols.student_name && (
-                      <th 
-                        onClick={() => { setSortField('student_name'); setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'); }}
-                        className="px-4 py-3 cursor-pointer hover:bg-slate-700 select-none"
-                      >
-                        Student Name ↕
-                      </th>
-                    )}
-                    {visibleCols.father_name && <th className="px-4 py-3">Father Name</th>}
-                    {visibleCols.mother_name && <th className="px-4 py-3">Mother Name</th>}
-                    {visibleCols.course_name && <th className="px-4 py-3">Course</th>}
-                    {visibleCols.admission_date && <th className="px-4 py-3">Admission Date</th>}
-                    {visibleCols.dob && <th className="px-4 py-3">DOB</th>}
-                    {visibleCols.mobile_no && <th className="px-4 py-3">Mobile No</th>}
-                    {visibleCols.alt_mobile_no && <th className="px-4 py-3">Alt Mobile</th>}
-                    {visibleCols.aadhar_no && <th className="px-4 py-3">Aadhar No</th>}
-                    {visibleCols.qualification && <th className="px-4 py-3">Qualification</th>}
-                    {visibleCols.address && <th className="px-4 py-3">Address</th>}
-                    {visibleCols.photo && <th className="px-4 py-3 text-center">Photo</th>}
+                    {visibleCols.photo && <th className="p-3">Photo</th>}
+                    {visibleCols.enrollment_no && <th className="p-3 cursor-pointer" onClick={() => { setSortField('enrollment_no'); setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'); }}>Enrollment No ↕</th>}
+                    {visibleCols.roll_no && <th className="p-3">Roll No</th>}
+                    {visibleCols.student_name && <th className="p-3 cursor-pointer" onClick={() => { setSortField('student_name'); setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'); }}>Student Name ↕</th>}
+                    {visibleCols.father_name && <th className="p-3">Father Name</th>}
+                    {visibleCols.mother_name && <th className="p-3">Mother Name</th>}
+                    {visibleCols.course_name && <th className="p-3 cursor-pointer" onClick={() => { setSortField('course_name'); setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'); }}>Course ↕</th>}
+                    {visibleCols.admission_date && <th className="p-3">Admission Date</th>}
+                    {visibleCols.dob && <th className="p-3">DOB</th>}
+                    {visibleCols.mobile_no && <th className="p-3">Mobile</th>}
+                    {visibleCols.aadhar_no && <th className="p-3">Aadhar</th>}
+                    {visibleCols.qualification && <th className="p-3">Qualification</th>}
+                    {visibleCols.address && <th className="p-3">Address</th>}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200 bg-white">
+                <tbody className="divide-y divide-slate-200">
                   {loadingStudents ? (
                     <tr>
-                      <td colSpan={14} className="text-center py-8 text-slate-500 font-medium">Loading student database...</td>
+                      <td colSpan={12} className="p-6 text-center text-slate-500">Loading student records...</td>
                     </tr>
                   ) : filteredStudents.length === 0 ? (
                     <tr>
-                      <td colSpan={14} className="text-center py-8 text-slate-500 font-medium">No registered student records found.</td>
+                      <td colSpan={12} className="p-6 text-center text-slate-500">No student records found.</td>
                     </tr>
                   ) : (
-                    filteredStudents.map((st, idx) => (
-                      <tr key={st.id || idx} className="hover:bg-sky-50/50 transition">
-                        {visibleCols.enrollment_no && <td className="px-4 py-3 font-bold text-slate-900">{st.enrollment_no}</td>}
-                        {visibleCols.roll_no && <td className="px-4 py-3">{st.roll_no || '-'}</td>}
-                        {visibleCols.student_name && <td className="px-4 py-3 font-semibold text-sky-900">{st.student_name}</td>}
-                        {visibleCols.father_name && <td className="px-4 py-3">{st.father_name}</td>}
-                        {visibleCols.mother_name && <td className="px-4 py-3">{st.mother_name || '-'}</td>}
-                        {visibleCols.course_name && <td className="px-4 py-3 font-medium bg-slate-50">{st.course_name}</td>}
-                        {visibleCols.admission_date && <td className="px-4 py-3">{st.admission_date}</td>}
-                        {visibleCols.dob && <td className="px-4 py-3">{st.dob || '-'}</td>}
-                        {visibleCols.mobile_no && <td className="px-4 py-3">{st.mobile_no || '-'}</td>}
-                        {visibleCols.alt_mobile_no && <td className="px-4 py-3">{st.alt_mobile_no || '-'}</td>}
-                        {visibleCols.aadhar_no && <td className="px-4 py-3">{st.aadhar_no || '-'}</td>}
-                        {visibleCols.qualification && <td className="px-4 py-3">{st.qualification || '-'}</td>}
-                        {visibleCols.address && <td className="px-4 py-3 max-w-xs truncate" title={st.address}>{st.address || '-'}</td>}
+                    filteredStudents.map((s) => (
+                      <tr key={s.enrollment_no} className="hover:bg-slate-50 transition">
                         {visibleCols.photo && (
-                          <td className="px-4 py-3 text-center">
-                            <img
-                              src={st.photo_url || '/student-placeholder.jpg'}
-                              alt="Student"
-                              className="w-8 h-8 object-cover rounded-full border border-slate-300 mx-auto"
-                            />
+                          <td className="p-2">
+                            <img src={s.photo_url || '/student-placeholder.jpg'} alt="" className="w-8 h-10 object-cover rounded border" />
                           </td>
                         )}
+                        {visibleCols.enrollment_no && <td className="p-3 font-bold text-sky-700">{s.enrollment_no}</td>}
+                        {visibleCols.roll_no && <td className="p-3">{s.roll_no || '-'}</td>}
+                        {visibleCols.student_name && <td className="p-3 font-semibold text-slate-900">{s.student_name}</td>}
+                        {visibleCols.father_name && <td className="p-3">{s.father_name}</td>}
+                        {visibleCols.mother_name && <td className="p-3">{s.mother_name || '-'}</td>}
+                        {visibleCols.course_name && <td className="p-3 font-medium">{s.course_name}</td>}
+                        {visibleCols.admission_date && <td className="p-3">{s.admission_date}</td>}
+                        {visibleCols.dob && <td className="p-3">{s.dob || '-'}</td>}
+                        {visibleCols.mobile_no && <td className="p-3">{s.mobile_no || '-'}</td>}
+                        {visibleCols.aadhar_no && <td className="p-3">{s.aadhar_no || '-'}</td>}
+                        {visibleCols.qualification && <td className="p-3">{s.qualification || '-'}</td>}
+                        {visibleCols.address && <td className="p-3 text-xs max-w-xs truncate">{s.address || '-'}</td>}
                       </tr>
                     ))
                   )}
@@ -874,175 +750,218 @@ export default function AdminDashboardPage() {
             </div>
 
             <div className="text-xs text-slate-500 text-right">
-              Showing {filteredStudents.length} of {studentsList.length} Total Registered Students
+              Showing <strong>{filteredStudents.length}</strong> of <strong>{studentsList.length}</strong> total registered students
             </div>
 
           </div>
         )}
 
-        {/* TAB 3: MARKSHEET / RESULT PUBLISHER */}
+        {/* TAB 3: MARKSHEET & RESULT MANAGEMENT */}
         {activeTab === 'marksheets' && (
-          <div className="bg-white p-6 sm:p-8 rounded-b-lg shadow border border-t-0 border-slate-200 space-y-6">
-            <h3 className="text-lg font-bold text-slate-800 border-b pb-2">Student Marksheet & Result Publisher</h3>
+          <div className="bg-white p-6 sm:p-8 rounded-b-lg shadow border border-t-0 border-slate-200">
+            
+            {/* Sub-tabs */}
+            <div className="flex gap-4 border-b pb-4 mb-6">
+              <button
+                onClick={() => setMarksheetSubTab('single')}
+                className={`px-4 py-2 rounded text-sm font-semibold transition ${
+                  marksheetSubTab === 'single' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                ➕ Single Student Marksheet Entry
+              </button>
+              <button
+                onClick={() => setMarksheetSubTab('excel')}
+                className={`px-4 py-2 rounded text-sm font-semibold transition ${
+                  marksheetSubTab === 'excel' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                📁 Bulk Upload Old Results via Excel
+              </button>
+            </div>
 
-            {marksheetStatus && (
-              <div className={`p-4 rounded border text-sm font-medium ${
-                marksheetStatus.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'
-              }`}>
-                {marksheetStatus.msg}
+            {/* SINGLE MARKSHEET ENTRY FORM */}
+            {marksheetSubTab === 'single' && (
+              <form onSubmit={handleMarksheetFormSubmit} className="space-y-6">
+                <h3 className="text-lg font-bold text-slate-800 border-b pb-2">Student Result / Marksheet Generation Form</h3>
+
+                {marksheetStatus && (
+                  <div className={`p-4 rounded border text-sm font-medium ${
+                    marksheetStatus.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'
+                  }`}>
+                    {marksheetStatus.msg}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Enrollment No *</label>
+                    <input
+                      type="text"
+                      value={singleMarksheet.enrollment_no}
+                      onChange={(e) => setSingleMarksheet({ ...singleMarksheet, enrollment_no: e.target.value })}
+                      placeholder="e.g. 1039954625"
+                      className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-sky-500"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Student Name *</label>
+                    <input
+                      type="text"
+                      value={singleMarksheet.student_name}
+                      onChange={(e) => setSingleMarksheet({ ...singleMarksheet, student_name: e.target.value })}
+                      placeholder="e.g. NISHA"
+                      className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-sky-500"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Course Name *</label>
+                    <input
+                      type="text"
+                      value={singleMarksheet.course_name}
+                      onChange={(e) => setSingleMarksheet({ ...singleMarksheet, course_name: e.target.value })}
+                      placeholder="e.g. CPAC"
+                      className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-sky-500"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Exam Session</label>
+                    <input
+                      type="text"
+                      value={singleMarksheet.exam_session}
+                      onChange={(e) => setSingleMarksheet({ ...singleMarksheet, exam_session: e.target.value })}
+                      placeholder="e.g. 2025-2026"
+                      className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-sky-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Semester / Year</label>
+                    <input
+                      type="text"
+                      value={singleMarksheet.semester_year}
+                      onChange={(e) => setSingleMarksheet({ ...singleMarksheet, semester_year: e.target.value })}
+                      placeholder="e.g. 1st Year"
+                      className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-sky-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Result Issue Date</label>
+                    <input
+                      type="text"
+                      value={singleMarksheet.issue_date}
+                      onChange={(e) => setSingleMarksheet({ ...singleMarksheet, issue_date: e.target.value })}
+                      placeholder="e.g. 20.05.2025"
+                      className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-sky-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Subject-wise Marks Table */}
+                <div className="border border-slate-200 rounded-lg p-4 bg-slate-50 space-y-3">
+                  <div className="flex items-center justify-between border-b pb-2">
+                    <h4 className="font-bold text-sm text-slate-800">Subject-wise Marks Breakdown</h4>
+                    <button
+                      type="button"
+                      onClick={addSubjectRow}
+                      className="px-3 py-1 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold rounded shadow"
+                    >
+                      + Add Subject
+                    </button>
+                  </div>
+
+                  {singleMarksheet.subjects.map((sub, idx) => (
+                    <div key={idx} className="grid grid-cols-12 gap-2 items-center text-xs">
+                      <div className="col-span-3">
+                        <input
+                          type="text"
+                          value={sub.subject_code}
+                          onChange={(e) => handleSubjectChange(idx, 'subject_code', e.target.value)}
+                          placeholder="Code (e.g. CPAC101)"
+                          className="w-full p-2 border rounded"
+                          required
+                        />
+                      </div>
+                      <div className="col-span-4">
+                        <input
+                          type="text"
+                          value={sub.subject_name}
+                          onChange={(e) => handleSubjectChange(idx, 'subject_name', e.target.value)}
+                          placeholder="Subject Title"
+                          className="w-full p-2 border rounded"
+                          required
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <input
+                          type="number"
+                          value={sub.max_marks}
+                          onChange={(e) => handleSubjectChange(idx, 'max_marks', e.target.value)}
+                          placeholder="Max"
+                          className="w-full p-2 border rounded text-center"
+                          required
+                        />
+                      </div>
+                      <div className="col-span-3">
+                        <input
+                          type="number"
+                          value={sub.obtained_marks}
+                          onChange={(e) => handleSubjectChange(idx, 'obtained_marks', e.target.value)}
+                          placeholder="Obtained"
+                          className="w-full p-2 border rounded text-center font-bold text-sky-700"
+                          required
+                        />
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Calculated Totals Box */}
+                  <div className="grid grid-cols-3 gap-4 pt-3 border-t text-sm font-bold bg-white p-3 rounded border">
+                    <div>Total Max Marks: <span className="text-slate-900">{singleMarksheet.total_max_marks}</span></div>
+                    <div>Obtained Marks: <span className="text-sky-700">{singleMarksheet.total_obtained_marks}</span></div>
+                    <div>Percentage: <span className="text-emerald-700">{singleMarksheet.percentage}% ({singleMarksheet.result_status})</span></div>
+                  </div>
+                </div>
+
+                <div className="pt-2 flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={submittingMarksheet}
+                    className="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded shadow transition"
+                  >
+                    {submittingMarksheet ? 'Publishing Result...' : 'Publish & Save Marksheet'}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* BULK MARKSHEET EXCEL UPLOAD */}
+            {marksheetSubTab === 'excel' && (
+              <div className="space-y-4 max-w-xl">
+                <h3 className="text-lg font-bold text-slate-800 border-b pb-2">Bulk Upload Old Marksheet Results via Excel</h3>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Upload an Excel/CSV file containing student results with columns: 
+                  <strong>enrollment_no, student_name, course_name, exam_session, total_max_marks, total_obtained_marks, percentage, result_status</strong>.
+                </p>
+                <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center bg-slate-50">
+                  <input
+                    type="file"
+                    accept=".csv, .xlsx, .xls"
+                    className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-sky-500 file:text-white"
+                  />
+                  <p className="text-xs text-slate-400 mt-2">Upload Result Sheets (Max 5000 students)</p>
+                </div>
+                <button
+                  type="button"
+                  className="px-6 py-2.5 bg-slate-900 text-white text-sm font-semibold rounded shadow"
+                >
+                  Process & Save Results
+                </button>
               </div>
             )}
 
-            <form onSubmit={handleMarksheetFormSubmit} className="space-y-6">
-              
-              {/* Basic Student Details */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded border">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Enrollment No *</label>
-                  <input
-                    type="text"
-                    value={singleMarksheet.enrollment_no}
-                    onChange={(e) => setSingleMarksheet({ ...singleMarksheet, enrollment_no: e.target.value })}
-                    placeholder="e.g. 1039954625"
-                    className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-sky-500 bg-white"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Student Name *</label>
-                  <input
-                    type="text"
-                    value={singleMarksheet.student_name}
-                    onChange={(e) => setSingleMarksheet({ ...singleMarksheet, student_name: e.target.value })}
-                    placeholder="e.g. NISHA"
-                    className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-sky-500 bg-white"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Course *</label>
-                  <input
-                    type="text"
-                    value={singleMarksheet.course_name}
-                    onChange={(e) => setSingleMarksheet({ ...singleMarksheet, course_name: e.target.value })}
-                    placeholder="e.g. CPAC"
-                    className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-sky-500 bg-white"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Exam Session *</label>
-                  <input
-                    type="text"
-                    value={singleMarksheet.exam_session}
-                    onChange={(e) => setSingleMarksheet({ ...singleMarksheet, exam_session: e.target.value })}
-                    placeholder="e.g. 2025-2026"
-                    className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-sky-500 bg-white"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Subject Breakdown Table */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-bold text-slate-800">Subject Marks Breakdown</h4>
-                  <button
-                    type="button"
-                    onClick={addSubjectRow}
-                    className="px-3 py-1 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded shadow"
-                  >
-                    + Add Subject
-                  </button>
-                </div>
-
-                <div className="overflow-x-auto border rounded">
-                  <table className="w-full text-left text-xs text-slate-800">
-                    <thead className="bg-slate-200 uppercase font-bold text-slate-700">
-                      <tr>
-                        <th className="px-3 py-2">Subject Code</th>
-                        <th className="px-3 py-2">Subject Title</th>
-                        <th className="px-3 py-2 w-28">Max Marks</th>
-                        <th className="px-3 py-2 w-28">Obtained</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200">
-                      {singleMarksheet.subjects.map((sub, idx) => (
-                        <tr key={idx}>
-                          <td className="p-2">
-                            <input
-                              type="text"
-                              value={sub.subject_code}
-                              onChange={(e) => handleSubjectChange(idx, 'subject_code', e.target.value)}
-                              className="w-full px-2 py-1 border rounded"
-                              required
-                            />
-                          </td>
-                          <td className="p-2">
-                            <input
-                              type="text"
-                              value={sub.subject_name}
-                              onChange={(e) => handleSubjectChange(idx, 'subject_name', e.target.value)}
-                              className="w-full px-2 py-1 border rounded"
-                              required
-                            />
-                          </td>
-                          <td className="p-2">
-                            <input
-                              type="number"
-                              value={sub.max_marks}
-                              onChange={(e) => handleSubjectChange(idx, 'max_marks', Number(e.target.value))}
-                              className="w-full px-2 py-1 border rounded"
-                              required
-                            />
-                          </td>
-                          <td className="p-2">
-                            <input
-                              type="number"
-                              value={sub.obtained_marks}
-                              onChange={(e) => handleSubjectChange(idx, 'obtained_marks', Number(e.target.value))}
-                              className="w-full px-2 py-1 border rounded"
-                              required
-                            />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Calculated Summary Cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
-                <div className="bg-slate-100 p-3 rounded border">
-                  <span className="block text-[11px] text-slate-500 font-bold uppercase">Total Obtained</span>
-                  <span className="text-lg font-black text-slate-800">{singleMarksheet.total_obtained_marks} / {singleMarksheet.total_max_marks}</span>
-                </div>
-                <div className="bg-slate-100 p-3 rounded border">
-                  <span className="block text-[11px] text-slate-500 font-bold uppercase">Percentage</span>
-                  <span className="text-lg font-black text-sky-700">{singleMarksheet.percentage}%</span>
-                </div>
-                <div className="bg-slate-100 p-3 rounded border">
-                  <span className="block text-[11px] text-slate-500 font-bold uppercase">Grade</span>
-                  <span className="text-lg font-black text-slate-800">{singleMarksheet.grade}</span>
-                </div>
-                <div className={`p-3 rounded border text-white ${singleMarksheet.result_status === 'PASS' ? 'bg-emerald-600' : 'bg-red-600'}`}>
-                  <span className="block text-[11px] text-emerald-100 font-bold uppercase">Result Status</span>
-                  <span className="text-lg font-black">{singleMarksheet.result_status}</span>
-                </div>
-              </div>
-
-              <div className="pt-2 flex justify-end">
-                <button
-                  type="submit"
-                  disabled={submittingMarksheet}
-                  className="px-8 py-3 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded shadow transition disabled:opacity-50"
-                >
-                  {submittingMarksheet ? 'Publishing Marksheet...' : 'Publish Marksheet / Result'}
-                </button>
-              </div>
-
-            </form>
           </div>
         )}
 

@@ -6,100 +6,71 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+// GET: Fetch marksheets
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const instituteCode = searchParams.get('instituteCode');
     const enrollmentNo = searchParams.get('enrollmentNo');
 
     let query = supabase.from('marksheets').select('*').order('created_at', { ascending: false });
 
     if (enrollmentNo) {
       query = query.eq('enrollment_no', enrollmentNo);
-    } else if (instituteCode) {
-      query = query.eq('institute_code', instituteCode);
     }
 
     const { data, error } = await query;
 
     if (error) {
-      return NextResponse.json({ message: error.message }, { status: 500 });
+      console.error('Supabase Error:', error);
+      return NextResponse.json({ message: 'Error fetching marksheets' }, { status: 500 });
     }
 
     return NextResponse.json({ marksheets: data || [] });
-  } catch (err: any) {
-    return NextResponse.json({ message: err?.message || 'Server error' }, { status: 500 });
+  } catch (err) {
+    console.error('Server Error:', err);
+    return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
   }
 }
 
+// POST: Insert or Update Student Marksheet
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    const markData = await request.json();
 
-    if (Array.isArray(body.marksheets)) {
-      const formatted = body.marksheets.map((m: any) => ({
-        institute_code: m.instituteCode,
-        enrollment_no: m.enrollmentNo,
-        student_name: m.studentName,
-        course_name: m.courseName,
-        exam_session: m.examSession,
-        semester_year: m.semesterYear,
-        subjects: m.subjects,
-        total_max_marks: m.totalMaxMarks,
-        total_obtained_marks: m.totalObtainedMarks,
-        percentage: m.percentage,
-        result_status: m.resultStatus || 'PASS',
-      }));
-
-      const { data, error } = await supabase.from('marksheets').insert(formatted).select();
-
-      if (error) {
-        return NextResponse.json({ message: error.message }, { status: 500 });
-      }
-
-      return NextResponse.json({ success: true, count: data?.length || 0 });
+    if (!markData.enrollment_no || !markData.student_name || !markData.course_name) {
+      return NextResponse.json(
+        { message: 'Enrollment No, Student Name, and Course Name are required.' },
+        { status: 400 }
+      );
     }
-
-    const {
-      instituteCode,
-      enrollmentNo,
-      studentName,
-      courseName,
-      examSession,
-      semesterYear,
-      subjects,
-      totalMaxMarks,
-      totalObtainedMarks,
-      percentage,
-      resultStatus,
-    } = body;
 
     const { data, error } = await supabase
       .from('marksheets')
-      .insert([
-        {
-          institute_code: instituteCode || 'MITM',
-          enrollment_no: enrollmentNo,
-          student_name: studentName,
-          course_name: courseName,
-          exam_session: examSession,
-          semester_year: semesterYear,
-          subjects: subjects,
-          total_max_marks: totalMaxMarks,
-          total_obtained_marks: totalObtainedMarks,
-          percentage: percentage,
-          result_status: resultStatus || 'PASS',
-        },
-      ])
-      .select()
-      .single();
+      .insert({
+        enrollment_no: markData.enrollment_no.trim(),
+        roll_no: markData.roll_no || null,
+        student_name: markData.student_name.trim(),
+        course_name: markData.course_name.trim(),
+        exam_session: markData.exam_session || '2025-2026',
+        semester_year: markData.semester_year || '1st Year',
+        subjects: markData.subjects || [],
+        total_max_marks: markData.total_max_marks || 0,
+        total_obtained_marks: markData.total_obtained_marks || 0,
+        percentage: markData.percentage || 0,
+        grade: markData.grade || 'A',
+        result_status: markData.result_status || 'PASS',
+        issue_date: markData.issue_date || '20.05.2025'
+      })
+      .select();
 
     if (error) {
+      console.error('Supabase Marksheet Error:', error);
       return NextResponse.json({ message: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, marksheet: data });
-  } catch (err: any) {
-    return NextResponse.json({ message: err?.message || 'Server error' }, { status: 500 });
+    return NextResponse.json({ message: 'Marksheet saved successfully', marksheet: data });
+  } catch (err) {
+    console.error('Server Error:', err);
+    return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
   }
 }

@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
@@ -26,34 +26,14 @@ export async function GET() {
   }
 }
 
-// POST: Insert or Update Single Student Admission Details (All Compulsory except alt_mobile_no)
+// POST: Insert or Update Single Student Admission Details (Full Extended Fields)
 export async function POST(request: Request) {
   try {
     const studentData = await request.json();
 
-    // Check required fields (everything except alt_mobile_no)
-    const compulsory = [
-      'enrollment_no',
-      'roll_no',
-      'student_name',
-      'father_name',
-      'mother_name',
-      'course_name',
-      'admission_date',
-      'dob',
-      'mobile_no',
-      'photo_url',
-      'aadhar_no',
-      'qualification',
-      'address',
-      'institute_name'
-    ];
-
-    const missingFields = compulsory.filter(f => !studentData[f] || !studentData[f].toString().trim());
-
-    if (missingFields.length > 0) {
+    if (!studentData.enrollment_no || !studentData.student_name || !studentData.course_name) {
       return NextResponse.json(
-        { message: `Missing required fields: ${missingFields.join(', ')}` },
+        { message: 'Enrollment No, Student Name, and Course Name are required fields.' },
         { status: 400 }
       );
     }
@@ -64,20 +44,20 @@ export async function POST(request: Request) {
       .upsert(
         {
           enrollment_no: studentData.enrollment_no.trim(),
-          roll_no: studentData.roll_no.trim(),
+          roll_no: studentData.roll_no || null,
           student_name: studentData.student_name.trim(),
           father_name: studentData.father_name.trim(),
-          mother_name: studentData.mother_name.trim(),
+          mother_name: studentData.mother_name || null,
           course_name: studentData.course_name.trim(),
-          admission_date: studentData.admission_date.trim(),
-          dob: studentData.dob.trim(),
-          mobile_no: studentData.mobile_no.trim(),
-          alt_mobile_no: studentData.alt_mobile_no ? studentData.alt_mobile_no.trim() : null, // OPTIONAL
-          photo_url: studentData.photo_url.trim(),
-          aadhar_no: studentData.aadhar_no.trim(),
-          qualification: studentData.qualification.trim(),
-          address: studentData.address.trim(),
-          institute_name: studentData.institute_name.trim(),
+          admission_date: studentData.admission_date || '11.04.2025',
+          dob: studentData.dob || null,
+          mobile_no: studentData.mobile_no || null,
+          alt_mobile_no: studentData.alt_mobile_no || null,
+          photo_url: studentData.photo_url || null,
+          aadhar_no: studentData.aadhar_no || null,
+          qualification: studentData.qualification || null,
+          address: studentData.address || null,
+          institute_name: studentData.institute_name || 'MITM',
         },
         { onConflict: 'enrollment_no' }
       )
