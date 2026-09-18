@@ -59,8 +59,7 @@ export default function AdminLoginPage() {
         {/* Header Branding */}
         <div className="text-center mb-6">
           <div className="flex justify-center gap-3 mb-3">
-            <img src="/mitm-logo.png" alt="Logo" className="h-12 object-contain" />
-            <img src="/manavta-text-logo.png" alt="Manavta" className="h-10 object-contain" />
+            <img src="/logo.png" alt="Logo" className="h-12 object-contain" />
           </div>
           <h2 className="text-2xl font-bold text-slate-900">Institute Portal Login</h2>
           <p className="text-xs text-slate-500 mt-1">Manavta Institute Management System</p>
@@ -75,14 +74,14 @@ export default function AdminLoginPage() {
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
-              Institute Code / Username
+              Institute Code
             </label>
             <input
               type="text"
               value={instituteCode}
               onChange={(e) => setInstituteCode(e.target.value)}
-              placeholder="e.g. MITM or admin"
-              className="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+              placeholder="e.g. MITM"
+              className="w-full px-4 py-2.5 border text-slate-600 border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
               required
             />
           </div>
@@ -96,7 +95,7 @@ export default function AdminLoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter Password"
-              className="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+              className="w-full px-4 py-2.5 border text-slate-600 border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
               required
             />
           </div>

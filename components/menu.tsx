@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
 
 export default function Header() {
   // 🔐 Auth state tracking (Aap ise baad me real auth/NextAuth se bind kar sakti hain)
