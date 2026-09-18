@@ -78,11 +78,11 @@ export default function AdminRegisterPage() {
         {/* Header Logo & Title */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-14 h-14 bg-sky-100 text-sky-600 rounded-full font-bold text-xl mb-3">
-            MI
+            MITM
           </div>
           <h2 className="text-2xl font-bold text-slate-800">Institute Admin Registration</h2>
           <p className="text-xs text-slate-500 mt-1">
-            Register your Institute / Center to manage students & marksheets
+            Register your Institute to manage students' details
           </p>
         </div>
 
@@ -102,30 +102,30 @@ export default function AdminRegisterPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Institute / Center Code (Unique Identifier)*
+              Institute Code (Unique Identifier)*
             </label>
             <input
               type="text"
               name="instituteCode"
               value={formData.instituteCode}
               onChange={handleChange}
-              placeholder="e.g. MITM-DELHI or CENTER-101"
-              className="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none uppercase"
+              placeholder="e.g. MITM or CENTER-101"
+              className="w-full px-3.5 py-2 text-sm text-slate-600 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none uppercase"
               required
             />
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Institute / Center Full Name*
+              Institute Full Name*
             </label>
             <input
               type="text"
               name="instituteName"
               value={formData.instituteName}
               onChange={handleChange}
-              placeholder="e.g. Manavta Head Campus"
-              className="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none"
+              placeholder="e.g. Manavta Institute"
+              className="w-full px-3.5 py-2 text-sm text-slate-600 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none"
               required
             />
           </div>
@@ -141,7 +141,7 @@ export default function AdminRegisterPage() {
                 value={formData.email}
                 onChange={handleChange}
                 placeholder="admin@institute.com"
-                className="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none"
+                className="w-full px-3.5 py-2 text-sm text-slate-600 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none"
                 required
               />
             </div>
@@ -156,7 +156,7 @@ export default function AdminRegisterPage() {
                 value={formData.mobileNo}
                 onChange={handleChange}
                 placeholder="9876543210"
-                className="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none"
+                className="w-full px-3.5 py-2 text-sm text-slate-600 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none"
                 required
               />
             </div>
@@ -173,7 +173,7 @@ export default function AdminRegisterPage() {
                 value={formData.password}
                 onChange={handleChange}
                 placeholder="••••••••"
-                className="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none"
+                className="w-full px-3.5 py-2 text-sm text-slate-600 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none"
                 required
               />
             </div>
@@ -188,7 +188,7 @@ export default function AdminRegisterPage() {
                 value={formData.confirmPassword}
                 onChange={handleChange}
                 placeholder="••••••••"
-                className="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none"
+                className="w-full px-3.5 py-2 text-sm text-slate-600 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none"
                 required
               />
             </div>
