@@ -190,14 +190,14 @@ export default function Header() {
             /* 🟢 LOGGED OUT VIEW: Show Register & Login buttons */
             <div className="flex items-center gap-1">
               <Link 
-                href="/login" 
+                href="/admin/login" 
                 className="text-md font-bold text-sky-100 hover:text-rose-200 transition py-2 px-1"
               >
                 Log In
               </Link>
               <span className='text-md font-bold text--100 hover:text-rose-200 transition py-2 px-1"'>/</span>
               <Link 
-                href="/register" 
+                href="/admin/register" 
                 className="text-md font-bold text-sky-100 hover:text-rose-200 transition py-2 px-1">
                 Register
               </Link>
