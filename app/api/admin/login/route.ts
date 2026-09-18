@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder';
-
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+function getSupabase() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder';
+  return createClient(supabaseUrl, supabaseAnonKey);
+}
 
 export async function POST(request: Request) {
   try {
@@ -18,7 +19,7 @@ export async function POST(request: Request) {
     }
 
     // Default Fallback Demo Account
-    if (instituteCode === 'MITM' && password === 'admin123') {
+    if ((instituteCode === 'MITM' || instituteCode === 'admin') && password === 'admin123') {
       return NextResponse.json({
         success: true,
         institute: {
@@ -28,6 +29,8 @@ export async function POST(request: Request) {
         },
       });
     }
+
+    const supabase = getSupabase();
 
     // Query institutes table
     const { data: institute, error } = await supabase
@@ -39,7 +42,7 @@ export async function POST(request: Request) {
     if (error) {
       console.error('Login Supabase Error:', error);
       return NextResponse.json(
-        { message: 'Database error' },
+        { message: 'Database query error. Please try again.' },
         { status: 500 }
       );
     }
