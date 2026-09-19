@@ -96,7 +96,7 @@ export default function VerifyRegistrationPage() {
         
         {/* Title Banner */}
         <h1 className="text-2xl sm:text-3xl font-bold text-center mb-6 text-black no-print">
-          View your Registration Information
+          View your Registration Information/ ID Card
         </h1>
 
         {/* Search Input Bar (Student Name + DOB) */}
@@ -150,18 +150,18 @@ export default function VerifyRegistrationPage() {
             {/* Header 3 Logos */}
             <div className="flex items-center justify-center gap-3 sm:gap-5 mb-8 border-b pb-6">
               <img 
-                src="/mitm-logo.png" 
+                src="/logo.png" 
                 alt="MITM Emblem" 
                 className="h-16 sm:h-20 object-contain"
               />
               <img 
-                src="/manavta-text-logo.png" 
+                src="/logo2.png" 
                 alt="MANAVTA Institute" 
                 className="h-12 sm:h-16 object-contain"
               />
               <img 
-                src="/iso-certified-badge.png" 
-                alt="ISO Certified Badge" 
+                src="/site.jpg" 
+                alt="Badge" 
                 className="h-16 sm:h-20 object-contain"
               />
             </div>
