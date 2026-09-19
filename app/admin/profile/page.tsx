@@ -22,7 +22,7 @@ export default function AdminProfilePage() {
   const [profileForm, setProfileForm] = useState({
     instituteCode: '',
     instituteName: 'Manavta Institute of Technology & Management',
-    directorName: 'Yogesh Chug',
+    directorName: 'Anoop Kumar',
     email: 'info@manavtainstitute.edu.in',
     mobileNo: '9876543210',
     address: 'Main Campus, Bilari, Moradabad, Uttar Pradesh'

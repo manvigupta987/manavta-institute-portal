@@ -162,7 +162,7 @@ export default function Menu() {
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setActiveDropdown(null)}></div>
                 <div className="absolute left-0 mt-2.5 w-60 bg-white rounded-xl shadow-xl border border-slate-100 py-2.5 z-20 animate-in fade-in slide-in-from-top-2 duration-150">
-                  <Link href="/verify" className="block px-4 py-2 text-sm text-slate-700 hover:bg-sky-50 hover:text-sky-700 font-semibold transition" onClick={() => setActiveDropdown(null)}>
+                  <Link href="/student/verify-registration" className="block px-4 py-2 text-sm text-slate-700 hover:bg-sky-50 hover:text-sky-700 font-semibold transition" onClick={() => setActiveDropdown(null)}>
                     🔍 Verify Registration
                   </Link>
                   <Link href="/student/check-result" className="block px-4 py-2 text-sm text-slate-700 hover:bg-sky-50 hover:text-sky-700 font-semibold transition" onClick={() => setActiveDropdown(null)}>
