@@ -47,6 +47,7 @@ interface MarksheetRecord {
   percentage: number;
   grade: string;
   issue_date: string;
+  photo_url?: string;
 }
 
 interface CertificateRecord {
@@ -63,6 +64,7 @@ interface CertificateRecord {
   grade: string;
   issue_date: string;
   institute_name: string;
+  photo_url?: string;
 }
 
 // =========================================================================
@@ -90,10 +92,15 @@ function parseCSV(text: string): string[][] {
   });
 }
 
+// QR Code URL Generator Helper
+function getQRCodeUrl(text: string) {
+  return `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(text)}`;
+}
+
 export default function AdminDashboardPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'admission' | 'marksheets' | 'certificates'>('admission');
-  const [isLetterheadMode, setIsLetterheadMode] = useState<boolean>(false);
+  const [isLetterhead, setIsLetterhead] = useState(false);
 
   // Authentication Guard
   useEffect(() => {
@@ -102,6 +109,11 @@ export default function AdminDashboardPage() {
       router.push('/admin/login');
     }
   }, [router]);
+
+  // Handle Print Action cleanly
+  const triggerPrint = () => {
+    window.print();
+  };
 
   // =========================================================================
   // TAB 1: STUDENT ADMISSION STATE & HANDLERS
@@ -127,6 +139,7 @@ export default function AdminDashboardPage() {
       roll_no: '103766',
       student_name: 'SHREYA CHUG',
       father_name: 'YOGESH CHUG',
+      mother_name: 'SUNITA CHUG',
       course_name: 'Computerised Professional Accounting Course',
       admission_date: '01.08.2025',
       institute_name: 'MITM, BILARI',
@@ -153,7 +166,7 @@ export default function AdminDashboardPage() {
     if (!singleStudent.enrollment_no || !singleStudent.student_name) return;
 
     setStudentsList([singleStudent, ...studentsList]);
-    setAdmissionStatus({ type: 'success', msg: 'Student admission record saved successfully!' });
+    setAdmissionStatus({ type: 'success', msg: 'Student admission details saved successfully!' });
     setSingleStudent({
       enrollment_no: '',
       roll_no: '',
@@ -162,7 +175,7 @@ export default function AdminDashboardPage() {
       mother_name: '',
       course_name: 'Computerised Professional Accounting Course',
       admission_date: '01.08.2025',
-      dob: '15.08.2005',
+      dob: '',
       mobile_no: '',
       photo_url: '',
       aadhar_no: '',
@@ -180,7 +193,7 @@ export default function AdminDashboardPage() {
         const text = evt.target?.result as string;
         const rows = parseCSV(text);
         if (rows.length <= 1) {
-          setAdmissionStatus({ type: 'error', msg: 'File is empty or missing header columns.' });
+          setAdmissionStatus({ type: 'error', msg: 'CSV file is empty or missing header row.' });
           return;
         }
 
@@ -191,7 +204,7 @@ export default function AdminDashboardPage() {
             newRecords.push({
               enrollment_no: cols[0] || `ENR-${Date.now()}-${i}`,
               roll_no: cols[1] || '',
-              student_name: cols[2] || '',
+              student_name: cols[2] || 'Student',
               father_name: cols[3] || '',
               mother_name: cols[4] || '',
               course_name: cols[5] || 'Professional Course',
@@ -207,20 +220,20 @@ export default function AdminDashboardPage() {
         setStudentsList([...newRecords, ...studentsList]);
         setAdmissionStatus({ type: 'success', msg: `Successfully imported ${newRecords.length} student admission records!` });
       } catch (err) {
-        setAdmissionStatus({ type: 'error', msg: 'Error processing Excel CSV file.' });
+        setAdmissionStatus({ type: 'error', msg: 'Failed to parse CSV file. Please check format.' });
       }
     };
     reader.readAsText(file);
   };
 
   const downloadAdmissionTemplate = () => {
-    const headers = ['Enrollment No', 'Roll No', 'Student Name', 'Father Name', 'Mother Name', 'Course Name', 'Admission Date', 'DOB', 'Mobile No', 'Institute Name', 'Photo URL'];
-    const sample = ['1039954663', '103766', 'SHREYA CHUG', 'YOGESH CHUG', 'SUNITA CHUG', 'Computerised Professional Accounting Course', '01.08.2025', '15.08.2005', '9876543210', 'MITM, BILARI', 'https://iili.io/CNGWoTG.md.jpg'];
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), sample.join(',')].join('\n');
+    const csvContent = 'data:text/csv;charset=utf-8,' + 
+      'Enrollment No,Roll No,Student Name,Father Name,Mother Name,Course Name,Admission Date,DOB,Mobile No,Institute Name,Photo URL\n' +
+      '1039954663,103766,SHREYA CHUG,YOGESH CHUG,SUNITA CHUG,Computerised Professional Accounting Course,01.08.2025,15.08.2005,9876543210,MITM BILARI,https://iili.io/CNGWoTG.md.jpg';
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', 'Student_Admission_Template.csv');
+    link.setAttribute('download', 'Admission_Excel_Template.csv');
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -240,16 +253,17 @@ export default function AdminDashboardPage() {
       study_center: 'MITM, BILARI',
       session: '2025-2027',
       subjects: [
-        { subject_code: 'CPAC 201', subject_name: 'IT TOOLS', max_marks: 150, theory_marks: 68, practical_marks: 45, total_marks: 113 },
-        { subject_code: 'CPAC 202', subject_name: 'Financial Accounting', max_marks: 150, theory_marks: 65, practical_marks: 40, total_marks: 105 },
-        { subject_code: 'CPAC 203', subject_name: 'Tally', max_marks: 150, theory_marks: 62, practical_marks: 38, total_marks: 100 },
-        { subject_code: 'CPAC 204', subject_name: 'Taxation & Project Work', max_marks: 150, theory_marks: 60, practical_marks: 36, total_marks: 96 }
+        { subject_code: 'CPAC 201', subject_name: 'IT TOOLS', max_marks: 150, theory_marks: 65, practical_marks: 45, total_marks: 110 },
+        { subject_code: 'CPAC 202', subject_name: 'Financial Accounting', max_marks: 150, theory_marks: 70, practical_marks: 48, total_marks: 118 },
+        { subject_code: 'CPAC 203', subject_name: 'Tally', max_marks: 150, theory_marks: 68, practical_marks: 46, total_marks: 114 },
+        { subject_code: 'CPAC 204', subject_name: 'Taxation & Project Work', max_marks: 150, theory_marks: 60, practical_marks: 42, total_marks: 102 }
       ],
       grand_total_max: 600,
-      grand_total_obtained: 414,
-      percentage: 69.00,
-      grade: 'C',
-      issue_date: '02.04.2026'
+      grand_total_obtained: 444,
+      percentage: 74.00,
+      grade: 'B',
+      issue_date: '13.07.2026',
+      photo_url: 'https://iili.io/CNGWoTG.md.jpg'
     }
   ]);
 
@@ -267,52 +281,57 @@ export default function AdminDashboardPage() {
         const text = evt.target?.result as string;
         const rows = parseCSV(text);
         if (rows.length <= 1) {
-          setMarksheetStatus({ type: 'error', msg: 'File is empty or missing headers.' });
+          setMarksheetStatus({ type: 'error', msg: 'CSV file is empty or missing headers.' });
           return;
         }
 
-        // Group rows by student enrollment or roll no
-        const grouped: { [key: string]: any } = {};
+        const mapByStudent: { [key: string]: MarksheetRecord } = {};
 
         for (let i = 1; i < rows.length; i++) {
           const cols = rows[i];
-          if (cols.length >= 6) {
-            const course = cols[0] || 'Professional Course';
-            const roll = cols[1] || '';
-            const enrollment = cols[2] || `ENR-${i}`;
+          if (cols.length >= 8) {
+            const courseName = cols[0] || 'Computerised Professional Accounting Course';
+            const rollNo = cols[1] || `ROLL-${i}`;
+            const enrollmentNo = cols[2] || `ENR-${i}`;
             const sName = cols[3] || 'Student Name';
             const fName = cols[4] || '';
             const center = cols[5] || 'MITM, BILARI';
-            const sess = cols[6] || '2025-2026';
-            const docNo = cols[7] || `DN-${3700 + i}`;
-            const pCode = cols[9] || `SUB-${i}`;
-            const pName = cols[10] || 'Subject Title';
+            const session = cols[6] || '2025-2027';
+            const serialNo = cols[7] || `DN-${3750 + i}`;
+            const photoUrl = cols[8] || '';
+
+            const key = `${enrollmentNo}_${rollNo}`;
+
+            if (!mapByStudent[key]) {
+              mapByStudent[key] = {
+                enrollment_no: enrollmentNo,
+                roll_no: rollNo,
+                serial_no: serialNo,
+                student_name: sName,
+                father_name: fName,
+                course_name: courseName,
+                study_center: center,
+                session: session,
+                subjects: [],
+                grand_total_max: 0,
+                grand_total_obtained: 0,
+                percentage: 0,
+                grade: 'C',
+                issue_date: cols[16] || '13.07.2026',
+                photo_url: photoUrl
+              };
+            }
+
+            const code = cols[9] || `SUB-${mapByStudent[key].subjects.length + 1}`;
+            const subName = cols[10] || 'Subject';
             const maxM = Number(cols[11]) || 150;
             const thM = Number(cols[12]) || 0;
             const prM = Number(cols[13]) || 0;
             const totM = Number(cols[14]) || (thM + prM);
-            const issueDate = cols[21] || cols[20] || '02.04.2026';
 
-            const key = `${enrollment}_${roll}`;
-
-            if (!grouped[key]) {
-              grouped[key] = {
-                enrollment_no: enrollment,
-                roll_no: roll,
-                serial_no: docNo,
-                student_name: sName,
-                father_name: fName,
-                course_name: course,
-                study_center: center,
-                session: sess,
-                issue_date: issueDate,
-                subjects: []
-              };
-            }
-
-            grouped[key].subjects.push({
-              subject_code: pCode,
-              subject_name: pName,
+            mapByStudent[key].subjects.push({
+              subject_code: code,
+              subject_name: subName,
               max_marks: maxM,
               theory_marks: thM,
               practical_marks: prM,
@@ -321,9 +340,9 @@ export default function AdminDashboardPage() {
           }
         }
 
-        const newRecords: MarksheetRecord[] = Object.values(grouped).map((st: any) => {
-          const totalMax = st.subjects.reduce((sum: number, s: SubjectMarks) => sum + s.max_marks, 0);
-          const totalObt = st.subjects.reduce((sum: number, s: SubjectMarks) => sum + s.total_marks, 0);
+        const parsedList = Object.values(mapByStudent).map((rec) => {
+          const totalMax = rec.subjects.reduce((sum, s) => sum + s.max_marks, 0);
+          const totalObt = rec.subjects.reduce((sum, s) => sum + s.total_marks, 0);
           const pct = totalMax > 0 ? Number(((totalObt / totalMax) * 100).toFixed(2)) : 0;
           let calcGrade = 'C';
           if (pct >= 90) calcGrade = 'Ex';
@@ -334,7 +353,7 @@ export default function AdminDashboardPage() {
           else calcGrade = 'F';
 
           return {
-            ...st,
+            ...rec,
             grand_total_max: totalMax,
             grand_total_obtained: totalObt,
             percentage: pct,
@@ -342,23 +361,31 @@ export default function AdminDashboardPage() {
           };
         });
 
-        setMarksheetsList([...newRecords, ...marksheetsList]);
-        setMarksheetStatus({ type: 'success', msg: `Successfully imported ${newRecords.length} student marksheets!` });
+        if (parsedList.length === 0) {
+          setMarksheetStatus({ type: 'error', msg: 'No valid marksheet records found in CSV file.' });
+          return;
+        }
+
+        setMarksheetsList([...parsedList, ...marksheetsList]);
+        setMarksheetStatus({ type: 'success', msg: `Successfully imported ${parsedList.length} student marksheet records!` });
       } catch (err) {
-        setMarksheetStatus({ type: 'error', msg: 'Error parsing Marksheet Excel CSV file.' });
+        setMarksheetStatus({ type: 'error', msg: 'Error parsing Marksheet CSV file.' });
       }
     };
     reader.readAsText(file);
   };
 
   const downloadMarksheetTemplate = () => {
-    const headers = ['Course Name', 'Roll No', 'Enrollment No', 'Name', "Father's Name", 'Study Center', 'Session', 'Document No', 'Photo', 'Paper Code', 'Paper name', 'max marks', 'theory', 'practical', 'Total Marks', 'Total of max marks', 'total theory', 'total practical', 'all total', 'Percentage', 'GRADE', 'Date Of Issue'];
-    const sample = ['Computerised Professional Accounting Course', '103766', '1039954663', 'SHREYA CHUG', 'YOGESH CHUG', 'MITM, BILARI', '2025-2027', 'DN-3754', '', 'CPAC 201', 'IT TOOLS', '150', '68', '45', '113', '600', '248', '166', '414', '69.00', 'C', '02.04.2026'];
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), sample.join(',')].join('\n');
+    const csvContent = 'data:text/csv;charset=utf-8,' + 
+      'Course Name,Roll No,Enrollment No,Name,Fathers Name,Study Center,Session,Document No,Photo,Paper Code,Paper name,max marks,theory,practical,Total Marks,Percentage,Date Of Issue\n' +
+      'Computerised Professional Accounting Course,103766,1039954663,SHREYA CHUG,YOGESH CHUG,MITM BILARI,2025-2027,DN-3754,https://iili.io/CNGWoTG.md.jpg,CPAC 201,IT TOOLS,150,65,45,110,74.00,13.07.2026\n' +
+      'Computerised Professional Accounting Course,103766,1039954663,SHREYA CHUG,YOGESH CHUG,MITM BILARI,2025-2027,DN-3754,https://iili.io/CNGWoTG.md.jpg,CPAC 202,Financial Accounting,150,70,48,118,74.00,13.07.2026\n' +
+      'Computerised Professional Accounting Course,103766,1039954663,SHREYA CHUG,YOGESH CHUG,MITM BILARI,2025-2027,DN-3754,https://iili.io/CNGWoTG.md.jpg,CPAC 203,Tally,150,68,46,114,74.00,13.07.2026\n' +
+      'Computerised Professional Accounting Course,103766,1039954663,SHREYA CHUG,YOGESH CHUG,MITM BILARI,2025-2027,DN-3754,https://iili.io/CNGWoTG.md.jpg,CPAC 204,Taxation & Project Work,150,60,42,102,74.00,13.07.2026';
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', 'Student_Marksheet_Excel_Template.csv');
+    link.setAttribute('download', 'Marksheet_Excel_Template.csv');
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -380,7 +407,8 @@ export default function AdminDashboardPage() {
       end_date: '31.01.2026',
       grade: 'C',
       issue_date: '02.04.2026',
-      institute_name: 'MITM BILARI'
+      institute_name: 'MITM BILARI',
+      photo_url: 'https://i.postimg.cc/zG4WY1PR/103354.jpg'
     }
   ]);
 
@@ -398,7 +426,7 @@ export default function AdminDashboardPage() {
         const text = evt.target?.result as string;
         const rows = parseCSV(text);
         if (rows.length <= 1) {
-          setCertificateStatus({ type: 'error', msg: 'File is empty or missing headers.' });
+          setCertificateStatus({ type: 'error', msg: 'CSV file is empty or missing headers.' });
           return;
         }
 
@@ -407,39 +435,40 @@ export default function AdminDashboardPage() {
           const cols = rows[i];
           if (cols.length >= 6) {
             newRecords.push({
-              roll_no: cols[0] || '',
-              enrollment_no: cols[1] || '',
+              roll_no: cols[0] || `ROLL-${i}`,
+              enrollment_no: cols[1] || `ENR-${i}`,
               session: cols[2] || '2025-2026',
               serial_no: cols[3] || `DN-${3760 + i}`,
-              student_name: cols[4] || '',
+              student_name: cols[4] || 'Student Name',
               father_name: cols[5] || '',
-              course_name: cols[6] || 'Professional Course',
+              course_name: cols[6] || 'Desktop Publishing Course',
               start_date: cols[7] || '01.08.2025',
               end_date: cols[8] || '31.01.2026',
-              grade: cols[9] || 'A',
+              grade: cols[9] || 'C',
               issue_date: cols[10] || '02.04.2026',
-              institute_name: cols[11] || 'MITM BILARI'
+              institute_name: cols[11] || 'MITM BILARI',
+              photo_url: cols[12] || '/student-placeholder.jpg'
             });
           }
         }
 
         setCertificatesList([...newRecords, ...certificatesList]);
-        setCertificateStatus({ type: 'success', msg: `Successfully imported ${newRecords.length} student certificates!` });
+        setCertificateStatus({ type: 'success', msg: `Successfully imported ${newRecords.length} student certificate records!` });
       } catch (err) {
-        setCertificateStatus({ type: 'error', msg: 'Error parsing Certificate Excel CSV file.' });
+        setCertificateStatus({ type: 'error', msg: 'Error parsing Certificate CSV file.' });
       }
     };
     reader.readAsText(file);
   };
 
   const downloadCertificateTemplate = () => {
-    const headers = ['Roll No', 'Enrollment No', 'Session', 'Serial No', 'Student Name', 'Father Name', 'Course Name', 'Start Date', 'End Date', 'Grade', 'Issue Date', 'Institute Name'];
-    const sample = ['103774', '1039954671', '2025-2026', 'DN-3762', 'BANTY', 'BATTU', 'Desktop Publishing Course', '01.08.2025', '31.01.2026', 'C', '02.04.2026', 'MITM BILARI'];
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), sample.join(',')].join('\n');
+    const csvContent = 'data:text/csv;charset=utf-8,' + 
+      'Roll No,Enrollment No,Session,Serial No,Student Name,Father Name,Course Name,Start Date,End Date,Grade,Issue Date,Institute Name,Photo URL\n' +
+      '103774,1039954671,2025-2026,DN-3762,BANTY,BATTU,Desktop Publishing Course,01.08.2025,31.01.2026,C,02.04.2026,MITM BILARI,https://i.postimg.cc/zG4WY1PR/103354.jpg';
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', 'Student_Certificate_Excel_Template.csv');
+    link.setAttribute('download', 'Certificate_Excel_Template.csv');
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -448,25 +477,53 @@ export default function AdminDashboardPage() {
   return (
     <div className="min-h-screen bg-slate-100 font-sans text-slate-900 pb-16">
       
-      {/* Print CSS Rules */}
+      {/* ========================================================================= */}
+      {/* 🖨️ BULLETPROOF PRINT CSS RULES (GUARENTEES EXACT SINGLE PAGE A4 PRINT) */}
+      {/* ========================================================================= */}
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
-          body * {
-            visibility: hidden;
-            background: white !important;
+          @page {
+            size: A4 portrait;
+            margin: 0;
           }
-          #printable-doc, #printable-doc * {
-            visibility: visible;
-          }
-          #printable-doc {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100% !important;
+          html, body {
+            height: 100% !important;
+            overflow: hidden !important;
+            background: #ffffff !important;
             margin: 0 !important;
-            padding: 20px !important;
-            border: none !important;
-            box-shadow: none !important;
+            padding: 0 !important;
+          }
+          /* Hide everything else on the screen */
+          body * {
+            visibility: hidden !important;
+          }
+          /* Show ONLY printable document container */
+          #printable-card, #printable-card *,
+          #printable-marksheet, #printable-marksheet *,
+          #printable-certificate, #printable-certificate * {
+            visibility: visible !important;
+          }
+          #printable-card, #printable-marksheet, #printable-certificate {
+            position: fixed !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            margin: 0 !important;
+            padding: 12mm 15mm !important;
+            box-sizing: border-box !important;
+            background: #ffffff !important;
+            z-index: 999999 !important;
+            page-break-after: avoid !important;
+            page-break-before: avoid !important;
+            page-break-inside: avoid !important;
+          }
+          /* Letterhead mode top margin padding */
+          .letterhead-mode {
+            padding-top: 45mm !important;
+          }
+          .hide-on-letterhead {
+            display: none !important;
           }
           .no-print {
             display: none !important;
@@ -474,7 +531,7 @@ export default function AdminDashboardPage() {
         }
       `}} />
 
-      {/* Header Bar */}
+      {/* Top Header Navbar */}
       <header className="bg-slate-900 text-white px-6 py-4 shadow-md flex items-center justify-between no-print">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-full bg-rose-100 flex items-center justify-center text-red-800 font-black text-base shadow">
@@ -585,7 +642,7 @@ export default function AdminDashboardPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Father&apos;s Name *</label>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Father's Name *</label>
                   <input
                     type="text"
                     value={singleStudent.father_name}
@@ -596,12 +653,12 @@ export default function AdminDashboardPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Mother&apos;s Name</label>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Mother's Name</label>
                   <input
                     type="text"
                     value={singleStudent.mother_name}
                     onChange={(e) => setSingleStudent({ ...singleStudent, mother_name: e.target.value })}
-                    placeholder="e.g. SUNITA DEVI"
+                    placeholder="e.g. SUNITA CHUG"
                     className="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-sky-500"
                   />
                 </div>
@@ -735,7 +792,7 @@ export default function AdminDashboardPage() {
                       .map((student) => (
                         <tr key={student.enrollment_no} className="hover:bg-slate-50 transition">
                           <td className="p-2.5 font-bold text-sky-700">{student.enrollment_no}</td>
-                          <td className="p-2.5">{student.roll_no || ''}</td>
+                          <td className="p-2.5">{student.roll_no || '-'}</td>
                           <td className="p-2.5 font-semibold text-slate-900">{student.student_name}</td>
                           <td className="p-2.5">{student.father_name}</td>
                           <td className="p-2.5">{student.course_name}</td>
@@ -805,7 +862,7 @@ export default function AdminDashboardPage() {
                   type="text"
                   value={marksheetSearch}
                   onChange={(e) => setMarksheetSearch(e.target.value)}
-                  placeholder="🔍 Search Marksheet by Roll No, Enrollment..."
+                  placeholder="🔍 Search Marksheet..."
                   className="px-3 py-1.5 border border-slate-300 rounded text-xs w-full sm:w-64 focus:ring-2 focus:ring-sky-500"
                 />
               </div>
@@ -903,7 +960,7 @@ export default function AdminDashboardPage() {
                   type="text"
                   value={certSearch}
                   onChange={(e) => setCertSearch(e.target.value)}
-                  placeholder="🔍 Search Certificate by Roll No, Enrollment..."
+                  placeholder="🔍 Search Certificate..."
                   className="px-3 py-1.5 border border-slate-300 rounded text-xs w-full sm:w-64 focus:ring-2 focus:ring-sky-500"
                 />
               </div>
@@ -975,13 +1032,15 @@ export default function AdminDashboardPage() {
             </div>
 
             {/* PRINTABLE ID CARD CONTAINER */}
-            <div id="printable-doc" className="bg-white border border-slate-200 shadow-md rounded-xl p-6 text-slate-900 font-sans">
+            <div id="printable-card" className="bg-white border border-slate-200 shadow-md rounded-xl p-6 text-slate-900 font-sans">
+              {/* Header 3 Logos */}
               <div className="flex items-center justify-center gap-4 border-b pb-4 mb-6">
                 <img src="/mitm-logo.png" alt="MITM Emblem" className="h-16 object-contain" />
                 <img src="/manavta-text-logo.png" alt="MANAVTA" className="h-12 object-contain" />
                 <img src="/iso-certified-badge.png" alt="ISO" className="h-16 object-contain" />
               </div>
 
+              {/* Grid: Details Left, Photo Right */}
               <div className="grid grid-cols-12 gap-4 items-start">
                 <div className="col-span-8 space-y-3 text-sm">
                   <div className="grid grid-cols-12"><span className="col-span-5 font-bold">Enrollment No:</span><span className="col-span-7">{selectedStudentForID.enrollment_no}</span></div>
@@ -997,280 +1056,302 @@ export default function AdminDashboardPage() {
                     <img src={selectedStudentForID.photo_url || '/student-placeholder.jpg'} alt="" className="w-full h-full object-cover" />
                   </div>
                   <div className="text-center pt-2 border-t border-slate-300 w-full flex flex-col items-center">
-                    <img src="/authorised-signature.png" alt="" className="h-10 object-contain mb-1" />
-                    <span className="text-[11px] font-bold text-slate-700">Authorised Signatory</span>
+                    <img src="/authorised-signature.png" alt="Signatory" className="h-8 object-contain mb-0.5" />
+                    <span className="text-[11px] font-bold text-slate-800">Authorised Signatory</span>
                     <span className="text-[9px] text-slate-500">Manavta Institute</span>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="flex justify-between items-center border-t pt-3 no-print">
-              <span className="text-xs text-slate-500">Formatted for standard Student Registration ID Card print.</span>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setSelectedStudentForID(null)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded transition cursor-pointer"
-                >
-                  Close
-                </button>
-                <button
-                  onClick={() => window.print()}
-                  className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs rounded shadow transition cursor-pointer flex items-center gap-1.5"
-                >
-                  🖨️ Print ID Card
-                </button>
-              </div>
+            <div className="flex justify-end gap-3 pt-3 border-t no-print">
+              <button
+                onClick={() => setSelectedStudentForID(null)}
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold rounded text-xs transition cursor-pointer"
+              >
+                Close
+              </button>
+              <button
+                onClick={triggerPrint}
+                className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded text-xs shadow transition cursor-pointer flex items-center gap-1.5"
+              >
+                🖨️ Print ID Card
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* 2. MARKSHEET PRINT PREVIEW MODAL */}
+      {/* 2. STUDENT MARKSHEET PRINT PREVIEW MODAL */}
       {selectedMarksheetForPrint && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 overflow-y-auto no-print">
-          <div className="bg-white rounded-2xl max-w-3xl w-full p-6 space-y-4 shadow-2xl my-8 relative">
+        <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-50 overflow-y-auto no-print">
+          <div className="bg-white rounded-2xl max-w-4xl w-full p-6 space-y-4 shadow-2xl my-8 relative max-h-[90vh] overflow-y-auto">
             
-            <div className="flex justify-between items-center border-b pb-3 no-print">
-              <h3 className="text-base font-bold text-slate-800">🖨️ Marksheet Document Print Preview</h3>
-              <button
-                onClick={() => setSelectedMarksheetForPrint(null)}
-                className="text-slate-400 hover:text-slate-600 font-bold text-lg cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Letterhead Toggle Control */}
-            <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg flex items-center gap-3 no-print">
-              <input
-                type="checkbox"
-                id="letterheadModeMarksheet"
-                checked={isLetterheadMode}
-                onChange={(e) => setIsLetterheadMode(e.target.checked)}
-                className="w-4 h-4 text-sky-600 rounded cursor-pointer"
-              />
-              <label htmlFor="letterheadModeMarksheet" className="text-xs font-bold text-amber-900 cursor-pointer">
-                📄 Print on Pre-Printed Physical Letterhead (Leave ~140px Top Margin Space & Hide Top Logos)
-              </label>
-            </div>
-
-            {/* PRINTABLE MARKSHEET DOCUMENT */}
-            <div 
-              id="printable-doc" 
-              className={`bg-white border border-slate-200 shadow-md p-8 text-slate-900 font-sans text-xs space-y-6 ${
-                isLetterheadMode ? 'pt-[140px]' : ''
-              }`}
-            >
-              {/* Header Logos (Only when NOT on pre-printed letterhead) */}
-              {!isLetterheadMode && (
-                <div className="flex items-center justify-between border-b pb-4">
-                  <div className="flex items-center gap-3">
-                    <img src="/mitm-logo.png" alt="MITM" className="h-14 object-contain" />
-                    <div>
-                      <h2 className="text-lg font-black text-slate-900 uppercase leading-none">MANAVTA INSTITUTE OF EDUCATION</h2>
-                      <p className="text-[10px] text-slate-600 mt-1 font-semibold">An ISO 9001:2015 Certified Educational Institution</p>
-                    </div>
-                  </div>
-                  <img src="/iso-certified-badge.png" alt="ISO" className="h-14 object-contain" />
-                </div>
-              )}
-
-              {/* Document Title */}
-              <div className="text-center border-b pb-2">
-                <h1 className="text-xl font-black tracking-wider text-slate-900 uppercase">STATEMENT OF MARKS</h1>
+            {/* Modal Controls Bar */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b pb-3 no-print">
+              <div>
+                <h3 className="text-base font-bold text-slate-800">🖨️ Student Marksheet Print Preview</h3>
+                <label className="flex items-center gap-2 mt-1 cursor-pointer text-xs font-semibold text-sky-700 bg-sky-50 px-2.5 py-1 rounded border border-sky-200">
+                  <input
+                    type="checkbox"
+                    checked={isLetterhead}
+                    onChange={(e) => setIsLetterhead(e.target.checked)}
+                    className="rounded text-sky-600 focus:ring-sky-500"
+                  />
+                  <span>📄 Print on Pre-Printed Letterhead (Leave Top Margin & Hide Header Logos)</span>
+                </label>
               </div>
-
-              {/* Candidate Info Block */}
-              <div className="space-y-2 text-xs border-b pb-4">
-                <div className="grid grid-cols-12"><span className="col-span-3 font-bold uppercase">PROGRAMME NAME:</span><span className="col-span-9 font-bold text-sky-800">{selectedMarksheetForPrint.course_name}</span></div>
-                <div className="grid grid-cols-12"><span className="col-span-3 font-bold uppercase">ROLL NO:</span><span className="col-span-4 font-mono font-bold">{selectedMarksheetForPrint.roll_no}</span><span className="col-span-2 font-bold uppercase">DOC NO:</span><span className="col-span-3 font-mono font-bold text-amber-800">{selectedMarksheetForPrint.serial_no}</span></div>
-                <div className="grid grid-cols-12"><span className="col-span-3 font-bold uppercase">ENROLLMENT NO:</span><span className="col-span-9 font-bold">{selectedMarksheetForPrint.enrollment_no}</span></div>
-                <div className="grid grid-cols-12"><span className="col-span-3 font-bold uppercase">NAME OF CANDIDATE:</span><span className="col-span-9 font-bold text-slate-900">{selectedMarksheetForPrint.student_name}</span></div>
-                <div className="grid grid-cols-12"><span className="col-span-3 font-bold uppercase">FATHERS NAME:</span><span className="col-span-9 font-bold">{selectedMarksheetForPrint.father_name}</span></div>
-                <div className="grid grid-cols-12"><span className="col-span-3 font-bold uppercase">STUDY CENTER:</span><span className="col-span-9 font-bold">{selectedMarksheetForPrint.study_center}</span></div>
-                <div className="grid grid-cols-12"><span className="col-span-3 font-bold uppercase">SESSION:</span><span className="col-span-9 font-bold">{selectedMarksheetForPrint.session}</span></div>
-              </div>
-
-              {/* Subject Breakdown Table */}
-              <table className="w-full border-collapse border border-slate-300 text-left text-xs">
-                <thead>
-                  <tr className="bg-slate-100 font-bold border-b border-slate-300">
-                    <th className="p-2 border-r border-slate-300">PAPER CODE</th>
-                    <th className="p-2 border-r border-slate-300">COURSE / PAPER NAME</th>
-                    <th className="p-2 border-r border-slate-300 text-center">MAX. MARKS</th>
-                    <th className="p-2 border-r border-slate-300 text-center">THEORY (100)</th>
-                    <th className="p-2 border-r border-slate-300 text-center">PRACTICAL (50)</th>
-                    <th className="p-2 text-center">TOTAL MARKS</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200">
-                  {selectedMarksheetForPrint.subjects.map((sub, idx) => (
-                    <tr key={idx}>
-                      <td className="p-2 border-r border-slate-300 font-mono font-bold">{sub.subject_code}</td>
-                      <td className="p-2 border-r border-slate-300 font-medium">{sub.subject_name}</td>
-                      <td className="p-2 border-r border-slate-300 text-center">{sub.max_marks}</td>
-                      <td className="p-2 border-r border-slate-300 text-center">{sub.theory_marks}</td>
-                      <td className="p-2 border-r border-slate-300 text-center">{sub.practical_marks}</td>
-                      <td className="p-2 text-center font-bold text-sky-800">{sub.total_marks}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              {/* Calculated Totals */}
-              <div className="flex justify-between items-center pt-2 font-bold text-xs border-t border-slate-300">
-                <div>GRAND TOTAL: <span className="font-mono text-sky-800">{selectedMarksheetForPrint.grand_total_obtained} / {selectedMarksheetForPrint.grand_total_max}</span></div>
-                <div>PER. (%): <span className="font-mono text-emerald-800">{selectedMarksheetForPrint.percentage}%</span></div>
-                <div>GRADE: <span className="font-mono text-amber-800">{selectedMarksheetForPrint.grade}</span></div>
-              </div>
-
-              {/* Signatures & Footer */}
-              <div className="pt-10 flex justify-between items-end">
-                <div className="text-center space-y-1">
-                  <div className="font-bold text-slate-800">Director (MITM BILARI)</div>
-                  <p className="text-[10px] text-slate-500">Authorized Signature</p>
-                </div>
-                <div className="text-center space-y-1">
-                  <div className="font-bold text-slate-800">Chief Exam Controller</div>
-                  <p className="text-[10px] text-slate-500">Date Of Issue - {selectedMarksheetForPrint.issue_date}</p>
-                </div>
-              </div>
-
-              <div className="border-t pt-3 text-[10px] text-slate-500 text-center font-semibold">
-                GRADE LEGEND - Ex: 90% & over | A: 80%-89% | B: 70%-79% | C: 60%-69% | D: 40%-59% | F: Less than 40% (Fail)
-              </div>
-            </div>
-
-            <div className="flex justify-between items-center border-t pt-3 no-print">
-              <span className="text-xs text-slate-500">Matches official MITM Statement of Marks format.</span>
-              <div className="flex gap-2">
+              
+              <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setSelectedMarksheetForPrint(null)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded transition cursor-pointer"
-                >
-                  Close
-                </button>
-                <button
-                  onClick={() => window.print()}
-                  className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs rounded shadow transition cursor-pointer flex items-center gap-1.5"
+                  onClick={triggerPrint}
+                  className="px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded text-xs shadow transition cursor-pointer flex items-center gap-1.5"
                 >
                   🖨️ Print Marksheet
                 </button>
+                <button
+                  onClick={() => setSelectedMarksheetForPrint(null)}
+                  className="text-slate-400 hover:text-slate-600 font-bold text-lg px-2 cursor-pointer"
+                >
+                  ✕
+                </button>
               </div>
             </div>
+
+            {/* PRINTABLE MARKSHEET CONTAINER */}
+            <div 
+              id="printable-marksheet" 
+              className={`bg-white border border-slate-300 p-6 sm:p-8 text-slate-900 font-sans relative ${
+                isLetterhead ? 'letterhead-mode' : ''
+              }`}
+            >
+              {/* Header 3 Logos & Title (Hidden if Letterhead mode) */}
+              <div className={`text-center space-y-2 mb-4 border-b pb-4 ${isLetterhead ? 'hide-on-letterhead' : ''}`}>
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <img src="/mitm-logo.png" alt="MITM Emblem" className="h-14 object-contain" />
+                  <img src="/manavta-text-logo.png" alt="MANAVTA" className="h-10 object-contain" />
+                  <img src="/iso-certified-badge.png" alt="ISO" className="h-14 object-contain" />
+                </div>
+                <h2 className="text-2xl font-black tracking-wide uppercase border-b-2 border-slate-900 inline-block pb-0.5">
+                  STATEMENT OF MARKS
+                </h2>
+              </div>
+
+              {/* Candidate Info Grid */}
+              <div className="space-y-1.5 text-xs sm:text-sm font-semibold border-b pb-3 mb-4">
+                <div className="grid grid-cols-12"><span className="col-span-4 uppercase text-slate-600">PROGRAMME NAME:</span><span className="col-span-8 font-bold text-slate-900">{selectedMarksheetForPrint.course_name}</span></div>
+                <div className="grid grid-cols-12">
+                  <span className="col-span-4 uppercase text-slate-600">ROLL NO:</span>
+                  <span className="col-span-4 font-bold text-slate-900">{selectedMarksheetForPrint.roll_no}</span>
+                  <span className="col-span-4 text-right font-mono font-bold text-amber-800">{selectedMarksheetForPrint.serial_no}</span>
+                </div>
+                <div className="grid grid-cols-12"><span className="col-span-4 uppercase text-slate-600">ENROLLMENT NO:</span><span className="col-span-8 font-bold text-slate-900">{selectedMarksheetForPrint.enrollment_no}</span></div>
+                <div className="grid grid-cols-12"><span className="col-span-4 uppercase text-slate-600">NAME OF CANDIDATE:</span><span className="col-span-8 font-bold text-slate-900 uppercase">{selectedMarksheetForPrint.student_name}</span></div>
+                <div className="grid grid-cols-12"><span className="col-span-4 uppercase text-slate-600">FATHERS NAME:</span><span className="col-span-8 font-bold text-slate-900 uppercase">{selectedMarksheetForPrint.father_name}</span></div>
+                <div className="grid grid-cols-12"><span className="col-span-4 uppercase text-slate-600">STUDY CENTER:</span><span className="col-span-8 font-bold text-slate-900">{selectedMarksheetForPrint.study_center}</span></div>
+                <div className="grid grid-cols-12"><span className="col-span-4 uppercase text-slate-600">SESSION:</span><span className="col-span-8 font-bold text-slate-900">{selectedMarksheetForPrint.session}</span></div>
+              </div>
+
+              {/* Subject Breakdown Table */}
+              <table className="w-full border-collapse border border-slate-900 text-center text-xs mb-4">
+                <thead>
+                  <tr className="bg-slate-100 font-bold border-b border-slate-900 uppercase">
+                    <th className="border border-slate-900 p-2 text-left">PAPER CODE</th>
+                    <th className="border border-slate-900 p-2 text-left">COURSE NAME</th>
+                    <th className="border border-slate-900 p-2">MAX. MARKS</th>
+                    <th className="border border-slate-900 p-2">THEORY</th>
+                    <th className="border border-slate-900 p-2">PRACTICAL</th>
+                    <th className="border border-slate-900 p-2">TOTAL MARKS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedMarksheetForPrint.subjects.map((sub, idx) => (
+                    <tr key={idx} className="border-b border-slate-300">
+                      <td className="border border-slate-900 p-2 font-mono font-bold text-left">{sub.subject_code}</td>
+                      <td className="border border-slate-900 p-2 text-left font-semibold">{sub.subject_name}</td>
+                      <td className="border border-slate-900 p-2 font-bold">{sub.max_marks}</td>
+                      <td className="border border-slate-900 p-2">{sub.theory_marks}</td>
+                      <td className="border border-slate-900 p-2">{sub.practical_marks}</td>
+                      <td className="border border-slate-900 p-2 font-bold text-sky-800">{sub.total_marks}</td>
+                    </tr>
+                  ))}
+                  <tr className="bg-slate-100 font-bold border-t-2 border-slate-900 text-xs">
+                    <td colSpan={2} className="border border-slate-900 p-2 text-right uppercase">GRAND TOTAL =</td>
+                    <td className="border border-slate-900 p-2">{selectedMarksheetForPrint.grand_total_max}</td>
+                    <td colSpan={2} className="border border-slate-900 p-2">OBTAINED: {selectedMarksheetForPrint.grand_total_obtained}</td>
+                    <td className="border border-slate-900 p-2 font-bold text-emerald-800">{selectedMarksheetForPrint.grand_total_obtained}</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              {/* Totals & Grade Bar */}
+              <div className="flex justify-between items-center border border-slate-900 p-2.5 font-bold text-xs bg-slate-50 mb-6">
+                <div>GRADE: <span className="text-base text-rose-700 ml-1">{selectedMarksheetForPrint.grade}</span></div>
+                <div>PERCENTAGE: <span className="text-base text-emerald-700 ml-1">{selectedMarksheetForPrint.percentage}%</span></div>
+              </div>
+
+              {/* Signatures + QR CODE Section */}
+              <div className="grid grid-cols-12 gap-2 items-end pt-4 border-t border-slate-300">
+                {/* Left Signature */}
+                <div className="col-span-4 text-center space-y-1">
+                  <img src="/authorised-signature.png" alt="Director Sign" className="h-10 object-contain mx-auto" />
+                  <p className="text-xs font-bold text-slate-900 border-t border-slate-400 pt-1">Director (MITM BILARI)</p>
+                </div>
+
+                {/* Center VERIFICATION QR CODE */}
+                <div className="col-span-4 flex flex-col items-center justify-center text-center">
+                  <img 
+                    src={getQRCodeUrl(`https://manavta-institute-portal.vercel.app/verify?enrollment=${selectedMarksheetForPrint.enrollment_no}`)}
+                    alt="Verification QR Code" 
+                    className="w-20 h-20 border border-slate-300 p-1 bg-white shadow-sm mb-1"
+                  />
+                  <span className="text-[9px] font-mono font-bold text-slate-600">Scan to Verify Result</span>
+                  <span className="text-[8px] text-slate-400">Date: {selectedMarksheetForPrint.issue_date}</span>
+                </div>
+
+                {/* Right Signature */}
+                <div className="col-span-4 text-center space-y-1">
+                  <img src="/authorised-signature.png" alt="Exam Controller Sign" className="h-10 object-contain mx-auto" />
+                  <p className="text-xs font-bold text-slate-900 border-t border-slate-400 pt-1">Chief Exam Controller</p>
+                </div>
+              </div>
+
+              {/* Footer Grade Legend */}
+              <div className="mt-6 pt-2 border-t text-[10px] text-center font-bold text-slate-600 tracking-tight">
+                GRADE LEGEND-Ex:90% & over | A:80%-89% | B:70%-79% | C:60%-69% | D:40%-59% | F:Less than 40%(Fail)
+              </div>
+            </div>
+
           </div>
         </div>
       )}
 
-      {/* 3. CERTIFICATE PRINT PREVIEW MODAL */}
+      {/* 3. STUDENT CERTIFICATE PRINT PREVIEW MODAL */}
       {selectedCertForPrint && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 overflow-y-auto no-print">
-          <div className="bg-white rounded-2xl max-w-3xl w-full p-6 space-y-4 shadow-2xl my-8 relative">
+        <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-50 overflow-y-auto no-print">
+          <div className="bg-white rounded-2xl max-w-3xl w-full p-6 space-y-4 shadow-2xl my-8 relative max-h-[90vh] overflow-y-auto">
             
-            <div className="flex justify-between items-center border-b pb-3 no-print">
-              <h3 className="text-base font-bold text-slate-800">🖨️ Certificate Document Print Preview</h3>
-              <button
-                onClick={() => setSelectedCertForPrint(null)}
-                className="text-slate-400 hover:text-slate-600 font-bold text-lg cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Letterhead Toggle Control */}
-            <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg flex items-center gap-3 no-print">
-              <input
-                type="checkbox"
-                id="letterheadModeCert"
-                checked={isLetterheadMode}
-                onChange={(e) => setIsLetterheadMode(e.target.checked)}
-                className="w-4 h-4 text-sky-600 rounded cursor-pointer"
-              />
-              <label htmlFor="letterheadModeCert" className="text-xs font-bold text-amber-900 cursor-pointer">
-                📄 Print on Pre-Printed Physical Letterhead (Leave ~140px Top Margin Space & Hide Top Logos)
-              </label>
-            </div>
-
-            {/* PRINTABLE CERTIFICATE DOCUMENT */}
-            <div 
-              id="printable-doc" 
-              className={`bg-white border-4 border-amber-500 rounded-xl p-8 text-slate-900 font-sans text-center space-y-6 shadow-sm ${
-                isLetterheadMode ? 'pt-[140px]' : ''
-              }`}
-            >
-              {/* Header Logos (Only when NOT on pre-printed letterhead) */}
-              {!isLetterheadMode && (
-                <div className="flex items-center justify-between border-b pb-4 mb-4">
-                  <img src="/mitm-logo.png" alt="MITM" className="h-16 object-contain" />
-                  <div>
-                    <h2 className="text-xl font-black text-slate-900 uppercase tracking-wide">MANAVTA INSTITUTE OF EDUCATION</h2>
-                    <p className="text-xs text-slate-600 font-semibold mt-1">An ISO 9001:2015 Certified Educational Institution</p>
-                  </div>
-                  <img src="/iso-certified-badge.png" alt="ISO" className="h-16 object-contain" />
-                </div>
-              )}
-
-              {/* Title & Serial Bar */}
-              <div className="space-y-2">
-                <h1 className="text-3xl font-black tracking-widest text-slate-900 uppercase">CERTIFICATE</h1>
-                <div className="flex flex-wrap justify-center gap-4 text-xs font-bold text-slate-700 pt-2 border-y py-2">
-                  <span>Roll No. - <strong className="font-mono text-slate-900">{selectedCertForPrint.roll_no}</strong></span>
-                  <span>Enrollment No. - <strong className="font-mono text-sky-800">{selectedCertForPrint.enrollment_no}</strong></span>
-                  <span>Session - <strong className="font-mono">{selectedCertForPrint.session}</strong></span>
-                  <span className="font-mono text-amber-800">{selectedCertForPrint.serial_no}</span>
-                </div>
+            {/* Modal Controls Bar */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b pb-3 no-print">
+              <div>
+                <h3 className="text-base font-bold text-slate-800">🖨️ Student Course Certificate Print Preview</h3>
+                <label className="flex items-center gap-2 mt-1 cursor-pointer text-xs font-semibold text-sky-700 bg-sky-50 px-2.5 py-1 rounded border border-sky-200">
+                  <input
+                    type="checkbox"
+                    checked={isLetterhead}
+                    onChange={(e) => setIsLetterhead(e.target.checked)}
+                    className="rounded text-sky-600 focus:ring-sky-500"
+                  />
+                  <span>📄 Print on Pre-Printed Letterhead (Leave Top Margin & Hide Header Logos)</span>
+                </label>
               </div>
-
-              {/* Main Award Body Paragraph */}
-              <div className="py-6 space-y-4 max-w-xl mx-auto leading-relaxed text-sm sm:text-base font-serif">
-                <p>
-                  This certificate is awarded to{' '}
-                  <strong className="font-sans font-black text-slate-900 uppercase text-lg border-b-2 border-slate-900 px-2">{selectedCertForPrint.student_name}</strong>{' '}
-                  S/O <strong className="font-sans font-bold text-slate-800 uppercase border-b border-slate-400 px-2">{selectedCertForPrint.father_name}</strong> in recognition of successful completion of{' '}
-                  <strong className="font-sans font-black text-sky-900 uppercase text-lg underline">{selectedCertForPrint.course_name}</strong> conducted in our own campus from{' '}
-                  <strong className="font-mono font-bold text-slate-800">{selectedCertForPrint.start_date}</strong> to{' '}
-                  <strong className="font-mono font-bold text-slate-800">{selectedCertForPrint.end_date}</strong>.
-                </p>
-                <p className="text-sm font-sans font-bold text-slate-800 pt-2">
-                  His/Her performance was grade <span className="text-lg font-black text-amber-800 border px-2 py-0.5 rounded bg-amber-50">{selectedCertForPrint.grade}</span>.
-                </p>
-              </div>
-
-              {/* Signatures */}
-              <div className="pt-8 flex justify-between items-end text-xs font-bold text-slate-800 px-4">
-                <div className="text-center space-y-1">
-                  <p>Director ({selectedCertForPrint.institute_name})</p>
-                  <p className="text-[10px] text-slate-500 font-normal">Authorized Signature</p>
-                </div>
-                <div className="text-center space-y-1">
-                  <p>Chief Exam Controller</p>
-                  <p className="text-[10px] text-slate-500 font-normal">Date Of Issue - {selectedCertForPrint.issue_date}</p>
-                </div>
-              </div>
-
-              <div className="border-t pt-3 text-[10px] text-slate-500 font-sans font-semibold">
-                GRADE LEGEND - Ex: 90% & over | A: 80%-89% | B: 70%-79% | C: 60%-69% | D: 40%-59% | F: Less than 40% (Fail)
-              </div>
-            </div>
-
-            <div className="flex justify-between items-center border-t pt-3 no-print">
-              <span className="text-xs text-slate-500">Matches official MITM Certificate format.</span>
-              <div className="flex gap-2">
+              
+              <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setSelectedCertForPrint(null)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded transition cursor-pointer"
-                >
-                  Close
-                </button>
-                <button
-                  onClick={() => window.print()}
-                  className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs rounded shadow transition cursor-pointer flex items-center gap-1.5"
+                  onClick={triggerPrint}
+                  className="px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded text-xs shadow transition cursor-pointer flex items-center gap-1.5"
                 >
                   🖨️ Print Certificate
                 </button>
+                <button
+                  onClick={() => setSelectedCertForPrint(null)}
+                  className="text-slate-400 hover:text-slate-600 font-bold text-lg px-2 cursor-pointer"
+                >
+                  ✕
+                </button>
               </div>
             </div>
+
+            {/* PRINTABLE CERTIFICATE CONTAINER */}
+            <div 
+              id="printable-certificate" 
+              className={`bg-white border-4 border-amber-600 p-8 text-slate-900 font-serif relative shadow-inner ${
+                isLetterhead ? 'letterhead-mode' : ''
+              }`}
+            >
+              {/* Header 3 Logos & Title (Hidden if Letterhead mode) */}
+              <div className={`text-center space-y-3 mb-6 ${isLetterhead ? 'hide-on-letterhead' : ''}`}>
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <img src="/mitm-logo.png" alt="MITM Emblem" className="h-16 object-contain" />
+                  <img src="/manavta-text-logo.png" alt="MANAVTA" className="h-12 object-contain" />
+                  <img src="/iso-certified-badge.png" alt="ISO" className="h-16 object-contain" />
+                </div>
+              </div>
+
+              {/* Certificate Details Top Bar */}
+              <div className="flex flex-wrap items-center justify-between border-b-2 border-slate-800 pb-2 mb-6 text-xs sm:text-sm font-sans font-bold text-slate-800">
+                <div>Roll No. - <span className="text-slate-900">{selectedCertForPrint.roll_no}</span></div>
+                <div>Enrollment No. - <span className="text-slate-900">{selectedCertForPrint.enrollment_no}</span></div>
+                <div>Session - <span className="text-slate-900">{selectedCertForPrint.session}</span></div>
+                <div className="text-amber-800 font-mono">{selectedCertForPrint.serial_no}</div>
+              </div>
+
+              {/* Main CERTIFICATE Heading */}
+              <div className="text-center mb-8">
+                <h1 className="text-3xl sm:text-4xl font-black tracking-widest text-slate-900 uppercase border-b-2 border-amber-600 inline-block pb-1">
+                  CERTIFICATE
+                </h1>
+              </div>
+
+              {/* Certificate Award Text */}
+              <div className="text-center leading-relaxed text-base sm:text-lg font-medium space-y-4 px-4 my-8 text-slate-800">
+                <p>
+                  This certificate is awarded to{' '}
+                  <span className="font-bold text-slate-900 underline underline-offset-4 uppercase px-1">
+                    {selectedCertForPrint.student_name}
+                  </span>{' '}
+                  S/O{' '}
+                  <span className="font-bold text-slate-900 underline underline-offset-4 uppercase px-1">
+                    {selectedCertForPrint.father_name}
+                  </span>{' '}
+                  in recognition of successful completion of{' '}
+                  <span className="font-bold text-slate-900 underline underline-offset-4 uppercase px-1">
+                    {selectedCertForPrint.course_name}
+                  </span>{' '}
+                  conducted in our own campus from{' '}
+                  <span className="font-semibold text-slate-900">{selectedCertForPrint.start_date}</span> to{' '}
+                  <span className="font-semibold text-slate-900">{selectedCertForPrint.end_date}</span>.
+                </p>
+                <p className="text-lg font-bold text-slate-900 pt-2">
+                  His/Her performance was grade{' '}
+                  <span className="text-xl font-black text-rose-700 bg-amber-50 px-3 py-1 rounded border border-amber-300">
+                    {selectedCertForPrint.grade}
+                  </span>.
+                </p>
+              </div>
+
+              {/* Signatures + VERIFICATION QR CODE Section */}
+              <div className="grid grid-cols-12 gap-2 items-end pt-8 mt-12 border-t border-slate-300 font-sans">
+                {/* Left Signature */}
+                <div className="col-span-4 text-center space-y-1">
+                  <img src="/authorised-signature.png" alt="Director Sign" className="h-10 object-contain mx-auto" />
+                  <p className="text-xs font-bold text-slate-900 border-t border-slate-400 pt-1">Director ({selectedCertForPrint.institute_name})</p>
+                </div>
+
+                {/* Center VERIFICATION QR CODE */}
+                <div className="col-span-4 flex flex-col items-center justify-center text-center">
+                  <img 
+                    src={getQRCodeUrl(`https://manavta-institute-portal.vercel.app/verify?enrollment=${selectedCertForPrint.enrollment_no}`)}
+                    alt="Verification QR Code" 
+                    className="w-20 h-20 border border-slate-300 p-1 bg-white shadow-sm mb-1"
+                  />
+                  <span className="text-[9px] font-mono font-bold text-slate-600">Scan to Verify Certificate</span>
+                  <span className="text-[8px] text-slate-400">Issued: {selectedCertForPrint.issue_date}</span>
+                </div>
+
+                {/* Right Signature */}
+                <div className="col-span-4 text-center space-y-1">
+                  <img src="/authorised-signature.png" alt="Exam Controller Sign" className="h-10 object-contain mx-auto" />
+                  <p className="text-xs font-bold text-slate-900 border-t border-slate-400 pt-1">Chief Exam Controller</p>
+                </div>
+              </div>
+
+              {/* Footer Grade Legend */}
+              <div className="mt-8 pt-2 border-t text-[10px] text-center font-sans font-bold text-slate-600 tracking-tight">
+                GRADE LEGEND-Ex:90% & over | A:80%-89% | B:70%-79% | C:60%-69% | D:40%-59% | F:Less than 40%(Fail)
+              </div>
+            </div>
+
           </div>
         </div>
       )}
