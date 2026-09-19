@@ -338,10 +338,10 @@ export default function AdminDashboardPage() {
       {/* Top Header Navbar */}
       <header className="bg-slate-900 text-white px-6 py-4 shadow flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <img src="/mitm-logo.png" alt="MITM" className="h-10 object-contain bg-white rounded p-1" />
+          <img src="/logo.png" alt="MITM" className="h-10 object-contain bg-white rounded p-1" />
           <div>
-            <h1 className="text-xl font-bold">MANAVTA Admin Control Panel</h1>
-            <p className="text-xs text-sky-400">Student Admission, Records & Marksheet Portal</p>
+            <h1 className="text-xl font-bold">Admin Dashboard Panel</h1>
+            <p className="text-xs text-sky-400">Student Admission, Certificate & Marksheet Portal</p>
           </div>
         </div>
         <button

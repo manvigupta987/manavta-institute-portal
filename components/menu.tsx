@@ -35,17 +35,6 @@ export default function Header() {
 
   return (
     <header className="w-full sticky top-0 z-50 bg-black shadow-md font-sans">
-      
-      {/* 🛠️ DEMO CONTROLLER (Sirf testing ke liye - isse aap live check kar sakti hain logged in aur logged out ka look) */}
-      <div className="w-full bg-amber-500 text-slate-900 text-[11px] font-bold py-1 px-4 text-center flex justify-center items-center gap-2">
-        <span>⚙️ Test Mode: Click to switch views ➜</span>
-        <button 
-          onClick={() => setIsLoggedIn(!isLoggedIn)} 
-          className="bg-white px-2 py-0.5 rounded text-amber-700 hover:bg-slate-100 transition shadow-sm text-[10px]"
-        >
-          {isLoggedIn ? "Simulate Logged Out" : "Simulate Logged In"}
-        </button>
-      </div>
 
       <div className="w-full max-w-[1400px] mx-auto px-4 md:px-6 py-4 flex justify-between items-center">
         
