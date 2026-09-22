@@ -14,8 +14,8 @@ interface StudentData {
 }
 
 export default function VerifyRegistrationPage() {
-  const [studentName, setStudentName] = useState('');
-  const [dob, setDob] = useState('');
+  
+  const [enrollmentNo, setEnrollmentNo] = useState('');
   const [loading, setLoading] = useState(false);
   const [student, setStudent] = useState<StudentData | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
@@ -23,10 +23,7 @@ export default function VerifyRegistrationPage() {
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!studentName.trim() || !dob.trim()) {
-      setErrorMsg('Please enter both Student Name and Date of Birth.');
-      return;
-    }
+    
 
     setLoading(true);
     setErrorMsg('');
@@ -37,18 +34,15 @@ export default function VerifyRegistrationPage() {
       const res = await fetch('/api/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          studentName: studentName.trim(),
-          dob: dob.trim()
-        }),
-      });
+      
+   });
 
       const data = await res.json();
 
       if (res.ok && data.student) {
         setStudent(data.student);
       } else {
-        setErrorMsg(data.message || 'No matching student record found. Please check Name & DOB.');
+        setErrorMsg(data.message || 'No matching student record found. Please check Enrollment No.');
       }
     } catch (err) {
       console.error(err);
@@ -96,24 +90,17 @@ export default function VerifyRegistrationPage() {
         
         {/* Title Banner */}
         <h1 className="text-2xl sm:text-3xl font-bold text-center mb-6 text-black no-print">
-          View your Registration Information/ ID Card
+          View your Registration Information & ID Card
         </h1>
 
-        {/* Search Input Bar (Student Name + DOB) */}
+        {/* Search Input Bar (Student Name + Enrollment No) */}
         <form onSubmit={handleSearch} className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-8 no-print">
+          
           <input
             type="text"
-            value={studentName}
-            onChange={(e) => setStudentName(e.target.value)}
-            placeholder="Enter Student Name"
-            className="w-full sm:w-56 px-4 py-2 text-base border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
-            required
-          />
-          <input
-            type="date"
-            value={dob}
-            onChange={(e) => setDob(e.target.value)}
-            placeholder="Select DOB"
+            value={enrollmentNo}
+            onChange={(e) => setEnrollmentNo(e.target.value)}
+            placeholder="Enter enrollment No"
             className="w-full sm:w-48 px-4 py-2 text-base border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
             required
           />
@@ -162,7 +149,7 @@ export default function VerifyRegistrationPage() {
               <img 
                 src="/site.jpg" 
                 alt="Badge" 
-                className="h-16 sm:h-20 object-contain"
+                className="h-14 sm:h-16 object-contain"
               />
             </div>
 

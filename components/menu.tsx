@@ -197,18 +197,12 @@ export default function Menu() {
             /* 🟢 LOGGED OUT VIEW: Show Register & Login buttons */
             <div className="flex items-center gap-1">
               <Link 
-                href="/admin/login" 
+                href="/login" 
                 className="text-md font-bold text-sky-100 hover:text-rose-200 transition py-2 px-1"
               >
                 Log In
               </Link>
-              <span className="text-md font-bold text-sky-100 py-2 px-1">/</span>
-              <Link 
-                href="/admin/register" 
-                className="text-md font-bold text-sky-100 hover:text-rose-200 transition py-2 px-1"
-              >
-                Register
-              </Link>
+              
             </div>
           ) : (
             /* 🔵 LOGGED IN VIEW: Show small avatar circle with sub-dropdown */

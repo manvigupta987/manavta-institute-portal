@@ -1,1357 +1,1896 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 
-// =========================================================================
-// TYPES
-// =========================================================================
-interface StudentRecord {
-  id?: string;
+// ============================================================================
+// DATA INTERFACES
+// ============================================================================
+
+export interface BranchInstitute {
+  id: string;
+  institute_code: string;
+  institute_name: string;
+  address: string;
+  mobile_no: string;
+  email: string;
+  password: string;
+  head_name?: string;
+  head_qualification?: string;
+  head_aadhar_no?: string;
+  head_photo_url?: string;
+  created_at: string;
+}
+
+export interface StudentRecord {
+  id: string;
   enrollment_no: string;
-  roll_no?: string;
+  roll_no: string;
+  serial_no: string; // Document No
   student_name: string;
   father_name: string;
   mother_name?: string;
   course_name: string;
   admission_date: string;
+  session: string;
   dob?: string;
+  qualification?: string;
   mobile_no?: string;
+  alt_mobile_no?: string;
+  aadhar_no: string;
   photo_url?: string;
-  aadhar_no?: string;
-  institute_name?: string;
-}
-
-interface SubjectMarks {
-  subject_code: string;
-  subject_name: string;
-  max_marks: number;
-  theory_marks: number;
-  practical_marks: number;
-  total_marks: number;
-}
-
-interface MarksheetRecord {
-  id?: string;
-  enrollment_no: string;
-  roll_no: string;
-  serial_no: string;
-  student_name: string;
-  father_name: string;
-  course_name: string;
+  address?: string;
   study_center: string;
-  session: string;
-  subjects: SubjectMarks[];
-  grand_total_max: number;
-  grand_total_obtained: number;
-  percentage: number;
-  grade: string;
-  issue_date: string;
-  photo_url?: string;
+  gender?: string;
+  status: 'APPROVED' | 'PENDING_APPROVAL';
+  branch_code?: string;
 }
 
-interface CertificateRecord {
-  id?: string;
-  roll_no: string;
-  enrollment_no: string;
-  session: string;
-  serial_no: string;
-  student_name: string;
-  father_name: string;
-  course_name: string;
-  start_date: string;
-  end_date: string;
-  grade: string;
-  issue_date: string;
-  institute_name: string;
-  photo_url?: string;
-}
 
-// =========================================================================
-// ROBUST CSV PARSER
-// =========================================================================
-function parseCSV(text: string): string[][] {
-  const lines = text.split(/\r?\n/).filter((l) => l.trim() !== '');
-  return lines.map((line) => {
-    const cells: string[] = [];
-    let current = '';
-    let inQuotes = false;
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i];
-      if (char === '"') {
-        inQuotes = !inQuotes;
-      } else if (char === ',' && !inQuotes) {
-        cells.push(current.trim().replace(/^"|"$/g, ''));
-        current = '';
-      } else {
-        current += char;
-      }
-    }
-    cells.push(current.trim().replace(/^"|"$/g, ''));
-    return cells;
+
+
+// Helper: Export to Excel/CSV
+const exportToExcel = (data: any[], filename: string) => {
+  if (!data || !data.length) {
+    alert("No data available to export!");
+    return;
+  }
+  const headers = Object.keys(data[0]);
+  const csvRows = [headers.join(',')];
+
+  data.forEach((row) => {
+    const values = headers.map((header) => {
+      const val = (row[header] === null || row[header] === undefined) ? '' : String(row[header]);
+ 
+      return `"${val.replace(/"/g, '""')}"`;
+    });
+    csvRows.push(values.join(','));
   });
-}
 
-// QR Code URL Generator Helper
-function getQRCodeUrl(text: string) {
-  return `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(text)}`;
-}
+  const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', `${filename}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
 
-export default function AdminDashboardPage() {
+export default function MITMAdminMasterDashboard() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'admission' | 'marksheets' | 'certificates'>('admission');
+
+  // Active Main Tab (6 Tabs)
+  const [activeTab, setActiveTab] = useState<'branches' | 'queue' | 'students' | 'idcards' | 'marksheets' | 'certificates'>('branches');
+
+  // Pre-printed Letterhead Toggle
   const [isLetterhead, setIsLetterhead] = useState(false);
 
-  // Authentication Guard
-  useEffect(() => {
-    const session = localStorage.getItem('admin_session');
-    if (!session) {
-      router.push('/admin/login');
+  // -------------------------------------------------------------------------
+  // INITIAL DATABASE STATES
+  // -------------------------------------------------------------------------
+
+  // Tab 1: Branches Data
+  const [branchesList, setBranchesList] = useState<BranchInstitute[]>([
+    {
+      id: 'b1',
+      institute_code: 'MITM-CHANDAUSI',
+      institute_name: 'MITM Chandausi Campus',
+      address: 'Main Road, Near Railway Station, Chandausi',
+      mobile_no: '9876543210',
+      email: 'chandausi@manavtainstitute.com',
+      password: 'chandausi@123',
+      head_name: 'Dr. R.K. Sharma',
+      head_qualification: 'M.Tech, Ph.D Computer Science',
+      head_aadhar_no: '987654321012',
+      head_photo_url: 'https://iili.io/3jruEzl.md.jpg',
+      created_at: '2025-08-01'
+    },
+    {
+      id: 'b2',
+      institute_code: 'MITM-BILARI',
+      institute_name: 'MITM Bilari Branch',
+      address: 'Station Road, Bilari, Moradabad',
+      mobile_no: '9123456789',
+      email: 'bilari@manavtainstitute.com',
+      password: 'bilari@123',
+      head_name: 'Prof. S.P. Verma',
+      head_qualification: 'MCA, M.Phil',
+      head_aadhar_no: '876543210987',
+      head_photo_url: 'https://iili.io/3jruEzl.md.jpg',
+      created_at: '2025-08-05'
     }
-  }, [router]);
+  ]);
 
-  // Handle Print Action cleanly
-  const triggerPrint = () => {
-    window.print();
-  };
+  // Tab 2: Queue Submissions
+  const [studentsQueue, setStudentsQueue] = useState<StudentRecord[]>([
+    {
+      id: 'q1',
+      enrollment_no: 'PENDING-001',
+      roll_no: 'UNASSIGNED',
+      serial_no: 'DN-9901',
+      student_name: 'VIKRAM SINGH',
+      father_name: 'RAJESH SINGH',
+      mother_name: 'SUNITA DEVI',
+      course_name: 'Advance Diploma In Computer Software',
+      admission_date: '2025-09-01',
+      session: '2025-2027',
+      dob: '2003-05-12',
+      qualification: '12th Pass',
+      mobile_no: '9876500111',
+      alt_mobile_no: '9876500112',
+      aadhar_no: '456789012345',
+      photo_url: 'https://iili.io/3jruEzl.md.jpg',
+      address: 'Near Bus Stand, Bilari',
+      study_center: 'MITM Bilari Branch',
+      status: 'PENDING_APPROVAL',
+      branch_code: 'MITM-BILARI'
+    },
+    {
+      id: 'q2',
+      enrollment_no: 'PENDING-002',
+      roll_no: 'UNASSIGNED',
+      serial_no: 'DN-9902',
+      student_name: 'POOJA SHARMA',
+      father_name: 'RAMESH SHARMA',
+      mother_name: 'GEETA SHARMA',
+      course_name: 'Computerised Professional Accounting Course',
+      admission_date: '2025-09-02',
+      session: '2025-2027',
+      dob: '2002-11-20',
+      qualification: 'B.Com Graduate',
+      mobile_no: '9876500222',
+      aadhar_no: '567890123456',
+      photo_url: 'https://iili.io/3jruEzl.md.jpg',
+      address: 'Civil Lines, Chandausi',
+      study_center: 'MITM Chandausi Campus',
+      status: 'PENDING_APPROVAL',
+      branch_code: 'MITM-CHANDAUSI'
+    }
+  ]);
 
-  // =========================================================================
-  // TAB 1: STUDENT ADMISSION STATE & HANDLERS
-  // =========================================================================
-  const [singleStudent, setSingleStudent] = useState<StudentRecord>({
-    enrollment_no: '',
+  // Tab 3 & 4: Master Student Records
+  const [studentsList, setStudentsList] = useState<StudentRecord[]>([
+    {
+      id: 's1',
+      enrollment_no: '1039954701',
+      roll_no: '103801',
+      serial_no: 'DN-3754',
+      student_name: 'SHREYA CHUG',
+      father_name: 'MOHAN CHUG',
+      mother_name: 'SANGEETA CHUG',
+      course_name: 'Computerised Professional Accounting Course',
+      admission_date: '2025-07-15',
+      session: '2025-2027',
+      dob: '2002-04-10',
+      qualification: 'B.Com',
+      mobile_no: '9876123450',
+      alt_mobile_no: '9876123451',
+      aadhar_no: '123456789012',
+      photo_url: 'https://iili.io/3jruEzl.md.jpg',
+      address: 'Main Market, Bilari, Moradabad',
+      study_center: 'Manavta Institute of Education - Bilari Campus',
+      status: 'APPROVED',
+      branch_code: 'MITM-BILARI'
+    },
+    {
+      id: 's2',
+      enrollment_no: '1039954702',
+      roll_no: '103802',
+      serial_no: 'DN-3762',
+      student_name: 'BANTY',
+      father_name: 'RAMESH KUMAR',
+      mother_name: 'SUDESH DEVI',
+      course_name: 'Desktop Publishing (DTP)',
+      admission_date: '2025-08-01',
+      session: '2025-2026',
+      dob: '2001-08-15',
+      qualification: '12th Pass',
+      mobile_no: '9876234561',
+      aadhar_no: '234567890123',
+      photo_url: 'https://iili.io/3jruEzl.md.jpg',
+      address: 'Railway Colony, Chandausi',
+      study_center: 'Manavta Institute of Education - Chandausi Campus',
+      status: 'APPROVED',
+      branch_code: 'MITM-CHANDAUSI'
+    }
+  ]);
+
+ 
+  // -------------------------------------------------------------------------
+  // FORM STATES & CONTROLS
+  // -------------------------------------------------------------------------
+
+  // Tab 1: New Branch Form State
+  const [newBranch, setNewBranch] = useState({
+    institute_code: '',
+    institute_name: '',
+    email: '',
+    mobile_no: '',
+    password: '',
+    address: '',
+    head_name: '',
+    head_qualification: '',
+    head_aadhar_no: '',
+    head_photo_url: ''
+  });
+  const [editingBranch, setEditingBranch] = useState<BranchInstitute | null>(null);
+
+  // Tab 2: Queue Filter & Search
+  const [selectedBranchFilter, setSelectedBranchFilter] = useState<string>('ALL');
+  const [queueSearchQuery, setQueueSearchQuery] = useState<string>('');
+
+  // Tab 3: Direct Student Registration Form State
+  const [newStudentForm, setNewStudentForm] = useState({
     roll_no: '',
+    enrollment_no: '',
+    serial_no: '', // Document No
+    course_name: 'Advance Diploma In Computer Software',
+    admission_date: new Date().toISOString().split('T')[0],
+    session: '2025-2027',
     student_name: '',
     father_name: '',
     mother_name: '',
-    course_name: 'Computerised Professional Accounting Course',
-    admission_date: '01.08.2025',
-    dob: '15.08.2005',
+    dob: '',
+    qualification: '',
     mobile_no: '',
-    photo_url: '',
+    alt_mobile_no: '',
     aadhar_no: '',
-    institute_name: 'MITM, BILARI'
+    photo_url: 'https://iili.io/3jruEzl.md.jpg',
+    address: '',
+    study_center: 'MITM Bilari Campus'
   });
+  const [editingStudent, setEditingStudent] = useState<StudentRecord | null>(null);
 
-  const [studentsList, setStudentsList] = useState<StudentRecord[]>([
-    {
-      enrollment_no: '1039954663',
-      roll_no: '103766',
-      student_name: 'SHREYA CHUG',
-      father_name: 'YOGESH CHUG',
-      mother_name: 'SUNITA CHUG',
-      course_name: 'Computerised Professional Accounting Course',
-      admission_date: '01.08.2025',
-      institute_name: 'MITM, BILARI',
-      photo_url: 'https://iili.io/CNGWoTG.md.jpg'
-    },
-    {
-      enrollment_no: '1039954671',
-      roll_no: '103774',
-      student_name: 'BANTY',
-      father_name: 'BATTU',
-      course_name: 'Desktop Publishing Course',
-      admission_date: '01.08.2025',
-      institute_name: 'MITM, BILARI',
-      photo_url: 'https://i.postimg.cc/zG4WY1PR/103354.jpg'
+  // Selection Checkboxes & Controls for Multi-Delete
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+  const [selectedIdCardIds, setSelectedIdCardIds] = useState<string[]>([]);
+  const [selectedMarksheetIds, setSelectedMarksheetIds] = useState<string[]>([]);
+  const [selectedCertificateIds, setSelectedCertificateIds] = useState<string[]>([]);
+
+  // Search & Sorting States
+  const [studentSearch, setStudentSearch] = useState('');
+  const [studentSortBy, setStudentSortBy] = useState<'name' | 'session' | 'enrollment'>('name');
+
+  const [idCardSearch, setIdCardSearch] = useState('');
+  const [idCardSortBy, setIdCardSortBy] = useState<'name' | 'session' | 'roll'>('name');
+
+  const [marksheetSearch, setMarksheetSearch] = useState('');
+  const [marksheetSortBy, setMarksheetSortBy] = useState<'name' | 'roll' | 'percentage'>('name');
+
+  const [certSearch, setCertSearch] = useState('');
+  const [certSortBy, setCertSortBy] = useState<'name' | 'roll' | 'date'>('name');
+
+  // Viewing ID Card Modal
+  const [viewingIdCardStudent, setViewingIdCardStudent] = useState<StudentRecord | null>(null);
+
+  // Assign Modal for Queue Student
+  const [assigningStudent, setAssigningStudent] = useState<StudentRecord | null>(null);
+  const [assignRoll, setAssignRoll] = useState('');
+  const [assignEnrollment, setAssignEnrollment] = useState('');
+
+  // -------------------------------------------------------------------------
+  // PHOTO UPLOAD VALIDATION HANDLER (JPG/PNG & <= 200KB)
+  // -------------------------------------------------------------------------
+  const handlePhotoUpload = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    onSuccess: (base64Url: string) => void
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Check Format (JPG / PNG)
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+    if (!validTypes.includes(file.type)) {
+      alert("❌ Photo must be in JPG or PNG format only!");
+      e.target.value = '';
+      return;
     }
-  ]);
 
-  const [admissionStatus, setAdmissionStatus] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
-  const [selectedStudentForID, setSelectedStudentForID] = useState<StudentRecord | null>(null);
-  const [admissionSearch, setAdmissionSearch] = useState('');
+    // Check Size (Max 200KB)
+    const maxSizeBytes = 200 * 1024; // 204,800 bytes
+    if (file.size > maxSizeBytes) {
+      alert(`❌ Photo size exceeds 200KB limit! (Selected file size: ${(file.size / 1024).toFixed(1)}KB)`);
+      e.target.value = '';
+      return;
+    }
 
-  const handleStudentFormSubmit = (e: React.FormEvent) => {
+    // Convert to Base64
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        onSuccess(event.target.result as string);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // -------------------------------------------------------------------------
+  // TAB 1 HANDLERS: BRANCH MANAGEMENT
+  // -------------------------------------------------------------------------
+  const handleRegisterBranch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!singleStudent.enrollment_no || !singleStudent.student_name) return;
+    if (!newBranch.institute_code || !newBranch.institute_name || !newBranch.mobile_no || !newBranch.password) {
+      alert("Please fill all required branch registration fields!");
+      return;
+    }
 
-    setStudentsList([singleStudent, ...studentsList]);
-    setAdmissionStatus({ type: 'success', msg: 'Student admission details saved successfully!' });
-    setSingleStudent({
-      enrollment_no: '',
+    const created: BranchInstitute = {
+      id: 'b_' + Date.now(),
+      institute_code: newBranch.institute_code.trim().toUpperCase(),
+      institute_name: newBranch.institute_name.trim(),
+      email: newBranch.email.trim(),
+      mobile_no: newBranch.mobile_no.trim(),
+      password: newBranch.password,
+      address: newBranch.address.trim(),
+      head_name: newBranch.head_name.trim(),
+      head_qualification: newBranch.head_qualification.trim(),
+      head_aadhar_no: newBranch.head_aadhar_no.trim(),
+      head_photo_url: newBranch.head_photo_url || 'https://iili.io/3jruEzl.md.jpg',
+      created_at: new Date().toISOString().split('T')[0]
+    };
+
+    setBranchesList([...branchesList, created]);
+    setNewBranch({
+      institute_code: '',
+      institute_name: '',
+      email: '',
+      mobile_no: '',
+      password: '',
+      address: '',
+      head_name: '',
+      head_qualification: '',
+      head_aadhar_no: '',
+      head_photo_url: ''
+    });
+    alert("✅ Branch Registered Successfully!");
+  };
+
+  const handleUpdateBranch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingBranch) return;
+    setBranchesList(branchesList.map(b => b.id === editingBranch.id ? editingBranch : b));
+    setEditingBranch(null);
+    alert("✅ Branch Details Updated Successfully!");
+  };
+
+  const handleDeleteBranchWithData = (branchCode: string) => {
+    if (confirm(`⚠️ WARNING: Are you sure you want to delete branch ${branchCode} along with ALL its submitted student records?`)) {
+      setBranchesList(branchesList.filter(b => b.institute_code !== branchCode));
+      setStudentsQueue(studentsQueue.filter(q => q.branch_code !== branchCode));
+      setStudentsList(studentsList.filter(s => s.branch_code !== branchCode));
+      alert("Branch and associated data deleted!");
+    }
+  };
+
+  const handleDeleteBranchKeepData = (branchCode: string) => {
+    if (confirm(`Are you sure you want to delete branch profile ${branchCode} while keeping student records intact?`)) {
+      setBranchesList(branchesList.filter(b => b.institute_code !== branchCode));
+      alert("Branch profile removed. Student records kept intact!");
+    }
+  };
+
+  // -------------------------------------------------------------------------
+  // TAB 2 HANDLERS: QUEUE & AUTO-ASSIGN
+  // -------------------------------------------------------------------------
+  const handleAssignSingleStudent = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!assigningStudent || !assignRoll || !assignEnrollment) {
+      alert("Roll No & Enrollment No are required!");
+      return;
+    }
+
+    const mergedStudent: StudentRecord = {
+      ...assigningStudent,
+      roll_no: assignRoll.trim(),
+      enrollment_no: assignEnrollment.trim(),
+      status: 'APPROVED'
+    };
+
+    setStudentsList([mergedStudent, ...studentsList]);
+    setStudentsQueue(studentsQueue.filter(q => q.id !== assigningStudent.id));
+    setAssigningStudent(null);
+    setAssignRoll('');
+    setAssignEnrollment('');
+    alert(`✅ Student ${mergedStudent.student_name} merged to Master Records with Roll No: ${mergedStudent.roll_no}!`);
+  };
+
+  const handleBulkAutoAssignMerge = () => {
+    if (!studentsQueue.length) {
+      alert("No students in queue to merge!");
+      return;
+    }
+
+    if (confirm(`🚀 Auto-assign Roll Nos and merge ALL ${studentsQueue.length} queue students to Central Master Records?`)) {
+      let startRoll = 103800 + studentsList.length + 1;
+      let startEnr = 1039954700 + studentsList.length + 1;
+
+      const newlyApproved: StudentRecord[] = studentsQueue.map((s, idx) => ({
+        ...s,
+        roll_no: String(startRoll + idx),
+        enrollment_no: String(startEnr + idx),
+        status: 'APPROVED'
+      }));
+
+      setStudentsList([...newlyApproved, ...studentsList]);
+      setStudentsQueue([]);
+      alert(`🎉 Successfully Auto-Assigned & Merged ${newlyApproved.length} Students to Master Records!`);
+    }
+  };
+
+  // -------------------------------------------------------------------------
+  // TAB 3 HANDLERS: DIRECT STUDENT REGISTRATION
+  // -------------------------------------------------------------------------
+  const handleRegisterDirectStudent = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Required Field Validations
+    if (!newStudentForm.roll_no || !newStudentForm.enrollment_no || !newStudentForm.serial_no ||
+        !newStudentForm.student_name || !newStudentForm.father_name || !newStudentForm.mother_name ||
+        !newStudentForm.dob || !newStudentForm.qualification || !newStudentForm.mobile_no ||
+        !newStudentForm.aadhar_no || !newStudentForm.address) {
+      alert("❌ All fields are compulsory EXCEPT Alt Mobile No!");
+      return;
+    }
+
+    if (newStudentForm.mobile_no.replace(/\D/g, '').length !== 10) {
+      alert("❌ Mobile No must be exactly 10 digits!");
+      return;
+    }
+
+    if (newStudentForm.alt_mobile_no && newStudentForm.alt_mobile_no.replace(/\D/g, '').length !== 10) {
+      alert("❌ Alt Mobile No must be exactly 10 digits!");
+      return;
+    }
+
+    if (newStudentForm.aadhar_no.replace(/\D/g, '').length !== 12) {
+      alert("❌ Aadhar No must be exactly 12 digits!");
+      return;
+    }
+
+    const studentRecord: StudentRecord = {
+      id: 's_' + Date.now(),
+      roll_no: newStudentForm.roll_no.trim(),
+      enrollment_no: newStudentForm.enrollment_no.trim(),
+      serial_no: newStudentForm.serial_no.trim(),
+      course_name: newStudentForm.course_name,
+      admission_date: newStudentForm.admission_date,
+      session: newStudentForm.session.trim(),
+      student_name: newStudentForm.student_name.trim().toUpperCase(),
+      father_name: newStudentForm.father_name.trim().toUpperCase(),
+      mother_name: newStudentForm.mother_name.trim().toUpperCase(),
+      dob: newStudentForm.dob,
+      qualification: newStudentForm.qualification.trim(),
+      mobile_no: newStudentForm.mobile_no.trim(),
+      alt_mobile_no: newStudentForm.alt_mobile_no.trim(),
+      aadhar_no: newStudentForm.aadhar_no.trim(),
+      photo_url: newStudentForm.photo_url || 'https://iili.io/3jruEzl.md.jpg',
+      address: newStudentForm.address.trim(),
+      study_center: newStudentForm.study_center,
+      status: 'APPROVED',
+      branch_code: 'HEAD_OFFICE'
+    };
+
+    setStudentsList([studentRecord, ...studentsList]);
+
+    // Reset Form
+    setNewStudentForm({
       roll_no: '',
+      enrollment_no: '',
+      serial_no: '',
+      course_name: 'Advance Diploma In Computer Software',
+      admission_date: new Date().toISOString().split('T')[0],
+      session: '2025-2027',
       student_name: '',
       father_name: '',
       mother_name: '',
-      course_name: 'Computerised Professional Accounting Course',
-      admission_date: '01.08.2025',
       dob: '',
+      qualification: '',
       mobile_no: '',
-      photo_url: '',
+      alt_mobile_no: '',
       aadhar_no: '',
-      institute_name: 'MITM, BILARI'
+      photo_url: 'https://iili.io/3jruEzl.md.jpg',
+      address: '',
+      study_center: 'MITM Bilari Campus'
     });
+
+    alert("✅ Direct Student Registered & Added to Master Records!");
   };
 
-  const handleAdmissionExcelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      try {
-        const text = evt.target?.result as string;
-        const rows = parseCSV(text);
-        if (rows.length <= 1) {
-          setAdmissionStatus({ type: 'error', msg: 'CSV file is empty or missing header row.' });
-          return;
-        }
-
-        const newRecords: StudentRecord[] = [];
-        for (let i = 1; i < rows.length; i++) {
-          const cols = rows[i];
-          if (cols.length >= 3) {
-            newRecords.push({
-              enrollment_no: cols[0] || `ENR-${Date.now()}-${i}`,
-              roll_no: cols[1] || '',
-              student_name: cols[2] || 'Student',
-              father_name: cols[3] || '',
-              mother_name: cols[4] || '',
-              course_name: cols[5] || 'Professional Course',
-              admission_date: cols[6] || '01.08.2025',
-              dob: cols[7] || '',
-              mobile_no: cols[8] || '',
-              institute_name: cols[9] || 'MITM, BILARI',
-              photo_url: cols[10] || '/student-placeholder.jpg'
-            });
-          }
-        }
-
-        setStudentsList([...newRecords, ...studentsList]);
-        setAdmissionStatus({ type: 'success', msg: `Successfully imported ${newRecords.length} student admission records!` });
-      } catch (err) {
-        setAdmissionStatus({ type: 'error', msg: 'Failed to parse CSV file. Please check format.' });
-      }
-    };
-    reader.readAsText(file);
+  const handleUpdateStudent = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingStudent) return;
+    setStudentsList(studentsList.map(s => s.id === editingStudent.id ? editingStudent : s));
+    setEditingStudent(null);
+    alert("✅ Student Record Updated!");
   };
 
-  const downloadAdmissionTemplate = () => {
-    const csvContent = 'data:text/csv;charset=utf-8,' + 
-      'Enrollment No,Roll No,Student Name,Father Name,Mother Name,Course Name,Admission Date,DOB,Mobile No,Institute Name,Photo URL\n' +
-      '1039954663,103766,SHREYA CHUG,YOGESH CHUG,SUNITA CHUG,Computerised Professional Accounting Course,01.08.2025,15.08.2005,9876543210,MITM BILARI,https://iili.io/CNGWoTG.md.jpg';
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', 'Admission_Excel_Template.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  // =========================================================================
-  // TAB 2: MARKSHEET UPLOAD & GENERATION STATE & HANDLERS
-  // =========================================================================
-  const [marksheetsList, setMarksheetsList] = useState<MarksheetRecord[]>([
-    {
-      enrollment_no: '1039954663',
-      roll_no: '103766',
-      serial_no: 'DN-3754',
-      student_name: 'SHREYA CHUG',
-      father_name: 'YOGESH CHUG',
-      course_name: 'Computerised Professional Accounting Course',
-      study_center: 'MITM, BILARI',
-      session: '2025-2027',
-      subjects: [
-        { subject_code: 'CPAC 201', subject_name: 'IT TOOLS', max_marks: 150, theory_marks: 65, practical_marks: 45, total_marks: 110 },
-        { subject_code: 'CPAC 202', subject_name: 'Financial Accounting', max_marks: 150, theory_marks: 70, practical_marks: 48, total_marks: 118 },
-        { subject_code: 'CPAC 203', subject_name: 'Tally', max_marks: 150, theory_marks: 68, practical_marks: 46, total_marks: 114 },
-        { subject_code: 'CPAC 204', subject_name: 'Taxation & Project Work', max_marks: 150, theory_marks: 60, practical_marks: 42, total_marks: 102 }
-      ],
-      grand_total_max: 600,
-      grand_total_obtained: 444,
-      percentage: 74.00,
-      grade: 'B',
-      issue_date: '13.07.2026',
-      photo_url: 'https://iili.io/CNGWoTG.md.jpg'
+  const handleDeleteSingleStudent = (id: string) => {
+    if (confirm("Are you sure you want to delete this student record?")) {
+      setStudentsList(studentsList.filter(s => s.id !== id));
+      setSelectedStudentIds(selectedStudentIds.filter(i => i !== id));
     }
-  ]);
+  };
 
-  const [marksheetStatus, setMarksheetStatus] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
-  const [selectedMarksheetForPrint, setSelectedMarksheetForPrint] = useState<MarksheetRecord | null>(null);
-  const [marksheetSearch, setMarksheetSearch] = useState('');
+  const handleDeleteSelectedStudents = () => {
+    if (!selectedStudentIds.length) {
+      alert("No students selected!");
+      return;
+    }
+    if (confirm(`Are you sure you want to delete ${selectedStudentIds.length} selected student records?`)) {
+      setStudentsList(studentsList.filter(s => !selectedStudentIds.includes(s.id)));
+      setSelectedStudentIds([]);
+      alert("Selected student records deleted!");
+    }
+  };
 
-  const handleMarksheetExcelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    // -------------------------------------------------------------------------
+  // PRINT FUNCTIONS FOR ALL 3 DELIVERABLES
+  // -------------------------------------------------------------------------
 
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      try {
-        const text = evt.target?.result as string;
-        const rows = parseCSV(text);
-        if (rows.length <= 1) {
-          setMarksheetStatus({ type: 'error', msg: 'CSV file is empty or missing headers.' });
-          return;
-        }
+  // 1. ID CARD PRINT (WITH BLACK BORDER)
+  const printIDCard = (student: StudentRecord) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert("Popup blocker active! Please allow popups for printing.");
+      return;
+    }
 
-        const mapByStudent: { [key: string]: MarksheetRecord } = {};
-
-        for (let i = 1; i < rows.length; i++) {
-          const cols = rows[i];
-          if (cols.length >= 8) {
-            const courseName = cols[0] || 'Computerised Professional Accounting Course';
-            const rollNo = cols[1] || `ROLL-${i}`;
-            const enrollmentNo = cols[2] || `ENR-${i}`;
-            const sName = cols[3] || 'Student Name';
-            const fName = cols[4] || '';
-            const center = cols[5] || 'MITM, BILARI';
-            const session = cols[6] || '2025-2027';
-            const serialNo = cols[7] || `DN-${3750 + i}`;
-            const photoUrl = cols[8] || '';
-
-            const key = `${enrollmentNo}_${rollNo}`;
-
-            if (!mapByStudent[key]) {
-              mapByStudent[key] = {
-                enrollment_no: enrollmentNo,
-                roll_no: rollNo,
-                serial_no: serialNo,
-                student_name: sName,
-                father_name: fName,
-                course_name: courseName,
-                study_center: center,
-                session: session,
-                subjects: [],
-                grand_total_max: 0,
-                grand_total_obtained: 0,
-                percentage: 0,
-                grade: 'C',
-                issue_date: cols[16] || '13.07.2026',
-                photo_url: photoUrl
-              };
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>ID Card - ${student.student_name}</title>
+          <style>
+            @page {
+              size: landscape;
+              margin: 10mm;
             }
+            body {
+              font-family: Arial, sans-serif;
+              margin: 0;
+              padding: 20px;
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              background-color: #ffffff;
+            }
+            /* ID CARD WITH CRISP BLACK BORDER */
+            .id-card-box {
+              width: 500px;
+              height: 310px;
+              border: 3px solid #000000; /* BLACK BORDER */
+              border-radius: 12px;
+              padding: 12px;
+              box-sizing: border-box;
+              background: #ffffff;
+              position: relative;
+              box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+              display: flex;
+              flex-direction: column;
+              justify-content: space-between;
+            }
+            .header-logos {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              border-bottom: 2px solid #000000;
+              padding-bottom: 6px;
+            }
+            .header-logos img {
+              height: 38px;
+              object-fit: contain;
+            }
+            .inst-title {
+              text-align: center;
+              font-size: 13px;
+              font-weight: bold;
+              color: #0f172a;
+              margin-top: 2px;
+              text-transform: uppercase;
+            }
+            .card-body {
+              display: flex;
+              gap: 12px;
+              margin-top: 8px;
+            }
+            .photo-box {
+              width: 100px;
+              height: 115px;
+              border: 2px solid #000000;
+              border-radius: 6px;
+              overflow: hidden;
+              flex-shrink: 0;
+            }
+            .photo-box img {
+              width: 100%;
+              height: 100%;
+              object-fit: cover;
+            }
+            .details-box {
+              flex: 1;
+              font-size: 11px;
+              line-height: 1.5;
+              color: #1e293b;
+            }
+            .details-box div {
+              margin-bottom: 3px;
+            }
+            .details-box span.label {
+              font-weight: bold;
+              color: #0f172a;
+              display: inline-block;
+              width: 105px;
+            }
+            .footer-sig {
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-end;
+              border-top: 1px solid #cbd5e1;
+              padding-top: 4px;
+              font-size: 10px;
+            }
+            .sig-img {
+              height: 28px;
+              margin-bottom: 2px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="id-card-box">
+            <div>
+              <div class="header-logos">
+                <img src="https://iili.io/3jruEzl.md.jpg" alt="Logo 1" />
+                <div class="inst-title">
+                  MANAVTA INSTITUTE OF EDUCATION
+                  <div style="font-size: 9px; color: #475569; font-weight: normal;">Regd. Govt. of India | MITM Campus</div>
+                </div>
+                <img src="https://iili.io/3jruEzl.md.jpg" alt="Logo 2" />
+              </div>
 
-            const code = cols[9] || `SUB-${mapByStudent[key].subjects.length + 1}`;
-            const subName = cols[10] || 'Subject';
-            const maxM = Number(cols[11]) || 150;
-            const thM = Number(cols[12]) || 0;
-            const prM = Number(cols[13]) || 0;
-            const totM = Number(cols[14]) || (thM + prM);
+              <div class="card-body">
+                <div class="photo-box">
+                  <img src="${student.photo_url || 'https://iili.io/3jruEzl.md.jpg'}" alt="Photo" />
+                </div>
+                <div class="details-box">
+                  <div><span class="label">Candidate Name:</span> <strong>${student.student_name}</strong></div>
+                  <div><span class="label">Father's Name:</span> ${student.father_name}</div>
+                  <div><span class="label">Roll Number:</span> <strong>${student.roll_no}</strong></div>
+                  <div><span class="label">Enrollment No:</span> ${student.enrollment_no}</div>
+                  <div><span class="label">Course:</span> ${student.course_name}</div>
+                  <div><span class="label">Session:</span> ${student.session}</div>
+                </div>
+              </div>
+            </div>
 
-            mapByStudent[key].subjects.push({
-              subject_code: code,
-              subject_name: subName,
-              max_marks: maxM,
-              theory_marks: thM,
-              practical_marks: prM,
-              total_marks: totM
-            });
-          }
-        }
+            <div class="footer-sig">
+              <div>
+                <div style="font-size: 9px; color: #64748b;">Study Center:</div>
+                <strong>${student.study_center}</strong>
+              </div>
+              <div style="text-align: center;">
+                <img src="/authorised-signature.png" class="sig-img" alt="Sig" onError="this.style.display='none'" />
+                <div style="font-weight: bold; border-top: 1px solid #000; padding-top: 1px;">Authorised Signatory</div>
+              </div>
+            </div>
+          </div>
 
-        const parsedList = Object.values(mapByStudent).map((rec) => {
-          const totalMax = rec.subjects.reduce((sum, s) => sum + s.max_marks, 0);
-          const totalObt = rec.subjects.reduce((sum, s) => sum + s.total_marks, 0);
-          const pct = totalMax > 0 ? Number(((totalObt / totalMax) * 100).toFixed(2)) : 0;
-          let calcGrade = 'C';
-          if (pct >= 90) calcGrade = 'Ex';
-          else if (pct >= 80) calcGrade = 'A';
-          else if (pct >= 70) calcGrade = 'B';
-          else if (pct >= 60) calcGrade = 'C';
-          else if (pct >= 40) calcGrade = 'D';
-          else calcGrade = 'F';
-
-          return {
-            ...rec,
-            grand_total_max: totalMax,
-            grand_total_obtained: totalObt,
-            percentage: pct,
-            grade: calcGrade
-          };
-        });
-
-        if (parsedList.length === 0) {
-          setMarksheetStatus({ type: 'error', msg: 'No valid marksheet records found in CSV file.' });
-          return;
-        }
-
-        setMarksheetsList([...parsedList, ...marksheetsList]);
-        setMarksheetStatus({ type: 'success', msg: `Successfully imported ${parsedList.length} student marksheet records!` });
-      } catch (err) {
-        setMarksheetStatus({ type: 'error', msg: 'Error parsing Marksheet CSV file.' });
-      }
-    };
-    reader.readAsText(file);
+          <script>
+            window.onload = function() {
+              window.print();
+            }
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
-  const downloadMarksheetTemplate = () => {
-    const csvContent = 'data:text/csv;charset=utf-8,' + 
-      'Course Name,Roll No,Enrollment No,Name,Fathers Name,Study Center,Session,Document No,Photo,Paper Code,Paper name,max marks,theory,practical,Total Marks,Percentage,Date Of Issue\n' +
-      'Computerised Professional Accounting Course,103766,1039954663,SHREYA CHUG,YOGESH CHUG,MITM BILARI,2025-2027,DN-3754,https://iili.io/CNGWoTG.md.jpg,CPAC 201,IT TOOLS,150,65,45,110,74.00,13.07.2026\n' +
-      'Computerised Professional Accounting Course,103766,1039954663,SHREYA CHUG,YOGESH CHUG,MITM BILARI,2025-2027,DN-3754,https://iili.io/CNGWoTG.md.jpg,CPAC 202,Financial Accounting,150,70,48,118,74.00,13.07.2026\n' +
-      'Computerised Professional Accounting Course,103766,1039954663,SHREYA CHUG,YOGESH CHUG,MITM BILARI,2025-2027,DN-3754,https://iili.io/CNGWoTG.md.jpg,CPAC 203,Tally,150,68,46,114,74.00,13.07.2026\n' +
-      'Computerised Professional Accounting Course,103766,1039954663,SHREYA CHUG,YOGESH CHUG,MITM BILARI,2025-2027,DN-3754,https://iili.io/CNGWoTG.md.jpg,CPAC 204,Taxation & Project Work,150,60,42,102,74.00,13.07.2026';
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', 'Marksheet_Excel_Template.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+    // -------------------------------------------------------------------------
+  // FILTERED & SORTED LISTS MEMO
+  // -------------------------------------------------------------------------
 
+  // Tab 3 Students List
+  const filteredStudents = useMemo(() => {
+    return studentsList
+      .filter(s => {
+        const q = studentSearch.toLowerCase().trim();
+        return (
+          !q ||
+          s.student_name.toLowerCase().includes(q) ||
+          s.father_name.toLowerCase().includes(q) ||
+          s.roll_no.toLowerCase().includes(q) ||
+          s.enrollment_no.toLowerCase().includes(q) ||
+          s.course_name.toLowerCase().includes(q) ||
+          s.session.toLowerCase().includes(q)
+        );
+      })
+      .sort((a, b) => {
+        if (studentSortBy === 'name') return a.student_name.localeCompare(b.student_name);
+        if (studentSortBy === 'session') return a.session.localeCompare(b.session);
+        if (studentSortBy === 'enrollment') return a.enrollment_no.localeCompare(b.enrollment_no);
+        return 0;
+      });
+  }, [studentsList, studentSearch, studentSortBy]);
+
+  // Tab 4 ID Cards List
+  const filteredIdCards = useMemo(() => {
+    return studentsList
+      .filter(s => {
+        const q = idCardSearch.toLowerCase().trim();
+        return (
+          !q ||
+          s.student_name.toLowerCase().includes(q) ||
+          s.roll_no.toLowerCase().includes(q) ||
+          s.enrollment_no.toLowerCase().includes(q) ||
+          s.branch_code?.toLowerCase().includes(q) ||
+          s.study_center.toLowerCase().includes(q)
+        );
+      })
+      .sort((a, b) => {
+        if (idCardSortBy === 'name') return a.student_name.localeCompare(b.student_name);
+        if (idCardSortBy === 'session') return a.session.localeCompare(b.session);
+        if (idCardSortBy === 'roll') return a.roll_no.localeCompare(b.roll_no);
+        return 0;
+      });
+  }, [studentsList, idCardSearch, idCardSortBy]);
+
+    // =========================================================================
+  // MAIN RENDER
   // =========================================================================
-  // TAB 3: CERTIFICATE UPLOAD & GENERATION STATE & HANDLERS
-  // =========================================================================
-  const [certificatesList, setCertificatesList] = useState<CertificateRecord[]>([
-    {
-      roll_no: '103774',
-      enrollment_no: '1039954671',
-      session: '2025-2026',
-      serial_no: 'DN-3762',
-      student_name: 'BANTY',
-      father_name: 'BATTU',
-      course_name: 'Desktop Publishing Course',
-      start_date: '01.08.2025',
-      end_date: '31.01.2026',
-      grade: 'C',
-      issue_date: '02.04.2026',
-      institute_name: 'MITM BILARI',
-      photo_url: 'https://i.postimg.cc/zG4WY1PR/103354.jpg'
-    }
-  ]);
-
-  const [certificateStatus, setCertificateStatus] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
-  const [selectedCertForPrint, setSelectedCertForPrint] = useState<CertificateRecord | null>(null);
-  const [certSearch, setCertSearch] = useState('');
-
-  const handleCertificateExcelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      try {
-        const text = evt.target?.result as string;
-        const rows = parseCSV(text);
-        if (rows.length <= 1) {
-          setCertificateStatus({ type: 'error', msg: 'CSV file is empty or missing headers.' });
-          return;
-        }
-
-        const newRecords: CertificateRecord[] = [];
-        for (let i = 1; i < rows.length; i++) {
-          const cols = rows[i];
-          if (cols.length >= 6) {
-            newRecords.push({
-              roll_no: cols[0] || `ROLL-${i}`,
-              enrollment_no: cols[1] || `ENR-${i}`,
-              session: cols[2] || '2025-2026',
-              serial_no: cols[3] || `DN-${3760 + i}`,
-              student_name: cols[4] || 'Student Name',
-              father_name: cols[5] || '',
-              course_name: cols[6] || 'Desktop Publishing Course',
-              start_date: cols[7] || '01.08.2025',
-              end_date: cols[8] || '31.01.2026',
-              grade: cols[9] || 'C',
-              issue_date: cols[10] || '02.04.2026',
-              institute_name: cols[11] || 'MITM BILARI',
-              photo_url: cols[12] || '/student-placeholder.jpg'
-            });
-          }
-        }
-
-        setCertificatesList([...newRecords, ...certificatesList]);
-        setCertificateStatus({ type: 'success', msg: `Successfully imported ${newRecords.length} student certificate records!` });
-      } catch (err) {
-        setCertificateStatus({ type: 'error', msg: 'Error parsing Certificate CSV file.' });
-      }
-    };
-    reader.readAsText(file);
-  };
-
-  const downloadCertificateTemplate = () => {
-    const csvContent = 'data:text/csv;charset=utf-8,' + 
-      'Roll No,Enrollment No,Session,Serial No,Student Name,Father Name,Course Name,Start Date,End Date,Grade,Issue Date,Institute Name,Photo URL\n' +
-      '103774,1039954671,2025-2026,DN-3762,BANTY,BATTU,Desktop Publishing Course,01.08.2025,31.01.2026,C,02.04.2026,MITM BILARI,https://i.postimg.cc/zG4WY1PR/103354.jpg';
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', 'Certificate_Excel_Template.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
 
   return (
-    <div className="min-h-screen bg-slate-100 font-sans text-slate-900 pb-16">
+    <div className="min-h-screen bg-slate-100 text-slate-800 font-sans pb-16">
       
-      {/* ========================================================================= */}
-      {/* 🖨️ BULLETPROOF PRINT CSS RULES (GUARENTEES EXACT SINGLE PAGE A4 PRINT) */}
-      {/* ========================================================================= */}
-      <style dangerouslySetInnerHTML={{ __html: `
-        @media print {
-          @page {
-            size: A4 portrait;
-            margin: 0;
-          }
-          html, body {
-            height: 100% !important;
-            overflow: hidden !important;
-            background: #ffffff !important;
-            margin: 0 !important;
-            padding: 0 !important;
-          }
-          /* Hide everything else on the screen */
-          body * {
-            visibility: hidden !important;
-          }
-          /* Show ONLY printable document container */
-          #printable-card, #printable-card *,
-          #printable-marksheet, #printable-marksheet *,
-          #printable-certificate, #printable-certificate * {
-            visibility: visible !important;
-          }
-          #printable-card, #printable-marksheet, #printable-certificate {
-            position: fixed !important;
-            left: 0 !important;
-            top: 0 !important;
-            width: 100vw !important;
-            height: 100vh !important;
-            margin: 0 !important;
-            padding: 12mm 15mm !important;
-            box-sizing: border-box !important;
-            background: #ffffff !important;
-            z-index: 999999 !important;
-            page-break-after: avoid !important;
-            page-break-before: avoid !important;
-            page-break-inside: avoid !important;
-          }
-          /* Letterhead mode top margin padding */
-          .letterhead-mode {
-            padding-top: 45mm !important;
-          }
-          .hide-on-letterhead {
-            display: none !important;
-          }
-          .no-print {
-            display: none !important;
-          }
-        }
-      `}} />
-
-      {/* Top Header Navbar */}
-      <header className="bg-slate-900 text-white px-6 py-4 shadow-md flex items-center justify-between no-print">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-rose-100 flex items-center justify-center text-red-800 font-black text-base shadow">
-            M
+      {/* HEADER BAR */}
+      <header className="bg-slate-900 text-white shadow-lg sticky top-0 z-30 border-b border-slate-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-sky-600 rounded-xl flex items-center justify-center font-black text-xl text-white shadow">
+              M
+            </div>
+            <div>
+              <h1 className="text-lg font-black tracking-wide uppercase text-white">
+                MITM Admin Portal (Head Office)
+              </h1>
+              <p className="text-xs text-sky-400 font-medium">
+                Manavta Institute of Education • Master Management Dashboard
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-lg font-bold leading-tight">MANAVTA Admin Control Center</h1>
-            <p className="text-xs text-sky-400">Institute Student Admission, Marksheet & Certificate Portal</p>
+
+          <div className="flex items-center gap-3">
+            {/* Pre-printed Letterhead Toggle */}
+            <label className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg border border-slate-700 text-xs font-semibold cursor-pointer transition">
+              <input
+                type="checkbox"
+                checked={isLetterhead}
+                onChange={(e) => setIsLetterhead(e.target.checked)}
+                className="rounded border-slate-600 text-sky-500 focus:ring-sky-500"
+              />
+              <span>Pre-printed Letterhead Top Margin (48mm)</span>
+            </label>
+
+            <button
+              onClick={() => router.push('/')}
+              className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow transition"
+            >
+              🔒 Logout
+            </button>
           </div>
         </div>
-        <button
-          onClick={() => {
-            localStorage.removeItem('admin_session');
-            router.push('/admin/login');
-          }}
-          className="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded shadow transition cursor-pointer"
-        >
-          Logout
-        </button>
+
+        {/* TOP NAVIGATION TABS (6 TABS) */}
+        <div className="bg-slate-800 border-t border-slate-700/60 overflow-x-auto">
+          <div className="max-w-7xl mx-auto px-4 flex items-center gap-1 py-1.5 text-xs font-bold min-w-max">
+            
+            <button
+              onClick={() => setActiveTab('branches')}
+              className={`px-4 py-2 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                activeTab === 'branches' ? 'bg-sky-600 text-white shadow' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+              }`}
+            >
+              <span>🏛️</span> Tab 1: Register Branches ({branchesList.length})
+            </button>
+
+            <button
+              onClick={() => setActiveTab('queue')}
+              className={`px-4 py-2 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                activeTab === 'queue' ? 'bg-sky-600 text-white shadow' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+              }`}
+            >
+              <span>📥</span> Tab 2: Branch Submissions ({studentsQueue.length})
+            </button>
+
+            <button
+              onClick={() => setActiveTab('students')}
+              className={`px-4 py-2 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                activeTab === 'students' ? 'bg-sky-600 text-white shadow' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+              }`}
+            >
+              <span>📋</span> Tab 3: Student Registration ({studentsList.length})
+            </button>
+
+            <button
+              onClick={() => setActiveTab('idcards')}
+              className={`px-4 py-2 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                activeTab === 'idcards' ? 'bg-sky-600 text-white shadow' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+              }`}
+            >
+              <span>📇</span> Tab 4: ID Card Print ({studentsList.length})
+            </button>
+
+          </div>
+        </div>
       </header>
 
-      {/* Main Container */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 mt-8">
-        
-        {/* Navigation Tabs */}
-        <div className="flex flex-wrap border-b border-slate-300 bg-white rounded-t-xl shadow-sm px-3 pt-3 gap-2 no-print">
-          <button
-            onClick={() => setActiveTab('admission')}
-            className={`px-6 py-3 font-bold text-sm rounded-t-xl transition cursor-pointer ${
-              activeTab === 'admission'
-                ? 'bg-sky-600 text-white shadow'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-            }`}
-          >
-            📝 1. Student Admission Details
-          </button>
-          <button
-            onClick={() => setActiveTab('marksheets')}
-            className={`px-6 py-3 font-bold text-sm rounded-t-xl transition cursor-pointer ${
-              activeTab === 'marksheets'
-                ? 'bg-sky-600 text-white shadow'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-            }`}
-          >
-            📊 2. Student Marks & Marksheet
-          </button>
-          <button
-            onClick={() => setActiveTab('certificates')}
-            className={`px-6 py-3 font-bold text-sm rounded-t-xl transition cursor-pointer ${
-              activeTab === 'certificates'
-                ? 'bg-sky-600 text-white shadow'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-            }`}
-          >
-            🎓 3. Student Marks & Certificate
-          </button>
-        </div>
+      {/* MAIN CONTENT CONTAINER */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-6">
 
-        {/* TAB 1: STUDENT ADMISSION DETAILS */}
-        {activeTab === 'admission' && (
-          <div className="bg-white p-6 sm:p-8 rounded-b-xl shadow-md border border-t-0 border-slate-200 space-y-8 no-print">
+        {/* ========================================================================= */}
+        {/* TAB 1: REGISTER BRANCH INSTITUTES & DIRECTORY */}
+        {/* ========================================================================= */}
+        {activeTab === 'branches' && (
+          <div className="space-y-6">
             
-            {admissionStatus && (
-              <div className={`p-4 rounded-lg border text-sm font-semibold ${
-                admissionStatus.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800'
-              }`}>
-                {admissionStatus.msg}
-              </div>
-            )}
+            {/* Branch Registration Form */}
+            <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-md border border-slate-200">
+              <h2 className="text-base font-bold text-slate-900 uppercase tracking-wide flex items-center gap-2 mb-4 border-b pb-3">
+                <span>🏛️</span> Register New Branch Institute
+              </h2>
 
-            {/* Single Student Admission Form */}
-            <form onSubmit={handleStudentFormSubmit} className="space-y-4 border-b pb-8">
-              <h3 className="text-base font-bold text-slate-800 uppercase tracking-wide">
-                ➕ Single Student Admission Entry Form
-              </h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Enrollment No *</label>
-                  <input
-                    type="text"
-                    value={singleStudent.enrollment_no}
-                    onChange={(e) => setSingleStudent({ ...singleStudent, enrollment_no: e.target.value })}
-                    placeholder="e.g. 1039954663"
-                    className="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-sky-500"
-                    required
-                  />
+              <form onSubmit={handleRegisterBranch} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Institute Code *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. MITM-BILARI"
+                      value={newBranch.institute_code}
+                      onChange={(e) => setNewBranch({ ...newBranch, institute_code: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-bold uppercase focus:ring-2 focus:ring-sky-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Institute Name *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. MITM Bilari Campus"
+                      value={newBranch.institute_name}
+                      onChange={(e) => setNewBranch({ ...newBranch, institute_name: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-sky-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Account Password *</label>
+                    <input
+                      type="password"
+                      required
+                      placeholder="••••••••"
+                      value={newBranch.password}
+                      onChange={(e) => setNewBranch({ ...newBranch, password: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-sky-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Branch Mobile Number *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="10 digit mobile"
+                      value={newBranch.mobile_no}
+                      onChange={(e) => setNewBranch({ ...newBranch, mobile_no: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-sky-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Email Address</label>
+                    <input
+                      type="email"
+                      placeholder="branch@institute.com"
+                      value={newBranch.email}
+                      onChange={(e) => setNewBranch({ ...newBranch, email: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-sky-500"
+                    />
+                  </div>
+
+                  {/* BRANCH HEAD DETAILS (NEW FIELDS) */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Branch Head Name</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Dr. R.K. Sharma"
+                      value={newBranch.head_name}
+                      onChange={(e) => setNewBranch({ ...newBranch, head_name: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-sky-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Head Qualification</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. M.Tech, Ph.D"
+                      value={newBranch.head_qualification}
+                      onChange={(e) => setNewBranch({ ...newBranch, head_qualification: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-sky-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Head Aadhar Number (12 Digits)</label>
+                    <input
+                      type="text"
+                      maxLength={12}
+                      placeholder="12 digit Aadhar"
+                      value={newBranch.head_aadhar_no}
+                      onChange={(e) => setNewBranch({ ...newBranch, head_aadhar_no: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono font-bold focus:ring-2 focus:ring-sky-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Head Photo (JPG/PNG &lt;= 200KB)</label>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/jpg,image/png"
+                      onChange={(e) => handlePhotoUpload(e, (url) => setNewBranch({ ...newBranch, head_photo_url: url }))}
+                      className="w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2 md:col-span-3">
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Complete Address</label>
+                    <input
+                      type="text"
+                      placeholder="Full campus location address"
+                      value={newBranch.address}
+                      onChange={(e) => setNewBranch({ ...newBranch, address: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-sky-500"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Roll No</label>
-                  <input
-                    type="text"
-                    value={singleStudent.roll_no}
-                    onChange={(e) => setSingleStudent({ ...singleStudent, roll_no: e.target.value })}
-                    placeholder="e.g. 103766"
-                    className="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-sky-500"
-                  />
+
+                <div className="flex justify-end pt-2">
+                  <button
+                    type="submit"
+                    className="px-5 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl text-xs shadow transition cursor-pointer"
+                  >
+                    ➕ Register Branch Institute
+                  </button>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Student Name *</label>
+              </form>
+            </div>
+
+            {/* Registered Branches Directory Table */}
+            <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-md border border-slate-200 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
+                  🏛️ Registered Branch Directory ({branchesList.length})
+                </h3>
+                <button
+                  onClick={() => exportToExcel(branchesList, 'Registered_Branches')}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-lg shadow transition"
+                >
+                  📥 Export Excel
+                </button>
+              </div>
+
+              <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                <table className="w-full text-left text-xs text-slate-800">
+                  <thead className="bg-slate-900 text-white font-semibold">
+                    <tr>
+                      <th className="p-3">Branch Code</th>
+                      <th className="p-3">Institute Name</th>
+                      <th className="p-3">Branch Head</th>
+                      <th className="p-3">Contact Details</th>
+                      <th className="p-3">Address</th>
+                      <th className="p-3 text-center">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {branchesList.map((branch) => (
+                      <tr key={branch.id} className="hover:bg-slate-50">
+                        <td className="p-3 font-mono font-bold text-sky-800">{branch.institute_code}</td>
+                        <td className="p-3 font-bold text-slate-900">{branch.institute_name}</td>
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            <img src={branch.head_photo_url || 'https://iili.io/3jruEzl.md.jpg'} alt="Head" className="w-8 h-8 rounded-full object-cover border border-slate-300" />
+                            <div>
+                              <div className="font-bold">{branch.head_name || 'N/A'}</div>
+                              <div className="text-[10px] text-slate-500">{branch.head_qualification}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-3">
+                          <div>📞 {branch.mobile_no}</div>
+                          <div className="text-slate-500">✉️ {branch.email}</div>
+                        </td>
+                        <td className="p-3 text-slate-600 max-w-xs truncate">{branch.address}</td>
+                        <td className="p-3 text-center">
+                          <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                            <button
+                              onClick={() => {
+                                setSelectedBranchFilter(branch.institute_code);
+                                setActiveTab('queue');
+                              }}
+                              className="px-2 py-1 bg-sky-100 hover:bg-sky-200 text-sky-800 text-[10px] font-bold rounded border border-sky-300"
+                            >
+                              👁️ View Records
+                            </button>
+                            <button
+                              onClick={() => setEditingBranch(branch)}
+                              className="px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 text-[10px] font-bold rounded border border-amber-300"
+                            >
+                              ✏️ Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteBranchWithData(branch.institute_code)}
+                              className="px-2 py-1 bg-rose-100 hover:bg-rose-200 text-rose-800 text-[10px] font-bold rounded border border-rose-300"
+                            >
+                              🗑️ Delete + Data
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB 2: BRANCH SUBMISSIONS & QUEUE WITH DROPDOWN & SEARCH */}
+        {/* ========================================================================= */}
+        {activeTab === 'queue' && (
+          <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-md border border-slate-200 space-y-6">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4 border-b pb-4">
+              <div>
+                <h2 className="text-base font-bold text-slate-900 uppercase tracking-wide flex items-center gap-2">
+                  <span>📥</span> Branch Student Submissions Queue ({studentsQueue.length})
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Assign Roll No & Enrollment No to merge branch students into Central Master Records.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                {/* 🔍 Search Input */}
+                <div className="relative flex-1 md:w-64">
                   <input
                     type="text"
-                    value={singleStudent.student_name}
-                    onChange={(e) => setSingleStudent({ ...singleStudent, student_name: e.target.value })}
-                    placeholder="e.g. SHREYA CHUG"
-                    className="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-sky-500"
-                    required
+                    value={queueSearchQuery}
+                    onChange={(e) => setQueueSearchQuery(e.target.value)}
+                    placeholder="🔍 Search Branch Name, Code, Student..."
+                    className="w-full pl-8 pr-8 py-1.5 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-sky-500 bg-slate-50"
                   />
+                  {queueSearchQuery && (
+                    <button
+                      onClick={() => setQueueSearchQuery('')}
+                      className="absolute right-2.5 top-1.5 text-slate-400 hover:text-slate-600 text-xs font-bold"
+                    >
+                      ✕
+                    </button>
+                  )}
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Father's Name *</label>
-                  <input
-                    type="text"
-                    value={singleStudent.father_name}
-                    onChange={(e) => setSingleStudent({ ...singleStudent, father_name: e.target.value })}
-                    placeholder="e.g. YOGESH CHUG"
-                    className="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-sky-500"
-                    required
-                  />
+
+                {/* 🏛️ Branch Name Dropdown Select at Top */}
+                <select
+                  value={selectedBranchFilter}
+                  onChange={(e) => setSelectedBranchFilter(e.target.value)}
+                  className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-bold bg-white focus:ring-2 focus:ring-sky-500"
+                >
+                  <option value="ALL">All Branches Queue ({branchesList.length})</option>
+                  {branchesList.map((b) => (
+                    <option key={b.id} value={b.institute_code}>
+                      {b.institute_code} - {b.institute_name}
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  onClick={handleBulkAutoAssignMerge}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow transition cursor-pointer flex items-center gap-1.5"
+                >
+                  🚀 Bulk Auto-Assign & Merge All
+                </button>
+              </div>
+            </div>
+
+            {/* Queue Table */}
+            <div className="overflow-x-auto border border-slate-200 rounded-xl shadow-sm">
+              <table className="w-full text-left text-xs text-slate-800">
+                <thead className="bg-slate-900 text-white font-semibold">
+                  <tr>
+                    <th className="p-3">Branch Code & Name</th>
+                    <th className="p-3">Candidate Name</th>
+                    <th className="p-3">Father's Name</th>
+                    <th className="p-3">Aadhar Number</th>
+                    <th className="p-3">Course Name</th>
+                    <th className="p-3 text-center">Current Status</th>
+                    <th className="p-3 text-center">Assign & Merge</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {(() => {
+                    const filtered = studentsQueue.filter((q) => {
+                      const matchesDropdown = selectedBranchFilter === 'ALL' || q.branch_code === selectedBranchFilter;
+                      const branchObj = branchesList.find((b) => b.institute_code === q.branch_code);
+                      const branchName = branchObj ? branchObj.institute_name : (q.study_center || '');
+                      const sq = queueSearchQuery.toLowerCase().trim();
+
+                      const matchesSearch =
+                        !sq ||
+                        (q.branch_code && q.branch_code.toLowerCase().includes(sq)) ||
+                        (branchName && branchName.toLowerCase().includes(sq)) ||
+                        (q.student_name && q.student_name.toLowerCase().includes(sq)) ||
+                        (q.father_name && q.father_name.toLowerCase().includes(sq)) ||
+                        (q.course_name && q.course_name.toLowerCase().includes(sq));
+
+                      return matchesDropdown && matchesSearch;
+                    });
+
+                    if (filtered.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan={7} className="p-8 text-center text-slate-500 font-medium">
+                            ❌ No branch student submissions found for selected branch / search.
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    return filtered.map((qStudent) => {
+                      const branchObj = branchesList.find((b) => b.institute_code === qStudent.branch_code);
+                      const branchName = branchObj ? branchObj.institute_name : qStudent.study_center;
+
+                      return (
+                        <tr key={qStudent.id} className="hover:bg-slate-50">
+                          <td className="p-3">
+                            <div className="font-mono font-bold text-sky-800">{qStudent.branch_code}</div>
+                            <div className="text-[11px] text-slate-500 truncate max-w-[150px]">{branchName}</div>
+                          </td>
+                          <td className="p-3 font-bold text-slate-900 uppercase">{qStudent.student_name}</td>
+                          <td className="p-3 font-medium uppercase">{qStudent.father_name}</td>
+                          <td className="p-3 font-mono font-bold text-amber-800">{qStudent.aadhar_no}</td>
+                          <td className="p-3 font-medium">{qStudent.course_name}</td>
+                          <td className="p-3 text-center">
+                            <span className="px-2.5 py-1 bg-amber-100 text-amber-800 font-bold rounded-full text-[10px] border border-amber-300">
+                              ⏳ Not Issued Yet
+                            </span>
+                          </td>
+                          <td className="p-3 text-center">
+                            <button
+                              onClick={() => {
+                                setAssigningStudent(qStudent);
+                                setAssignRoll(String(103800 + studentsList.length + 1));
+                                setAssignEnrollment(String(1039954700 + studentsList.length + 1));
+                              }}
+                              className="px-3 py-1 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-lg text-[11px] shadow transition cursor-pointer"
+                            >
+                              ⚡ Issue Roll/Enr & Merge
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    });
+                  })()}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB 3: STUDENT REGISTRATION (DIRECT ADMISSION & MASTER RECORD) */}
+        {/* ========================================================================= */}
+        {activeTab === 'students' && (
+          <div className="space-y-6">
+            
+            {/* Registration Form */}
+            <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-md border border-slate-200">
+              <h2 className="text-base font-bold text-slate-900 uppercase tracking-wide flex items-center gap-2 mb-4 border-b pb-3">
+                <span>📋</span> Direct Student Admission Form
+              </h2>
+
+              <form onSubmit={handleRegisterDirectStudent} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Roll No *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. 103803"
+                      value={newStudentForm.roll_no}
+                      onChange={(e) => setNewStudentForm({ ...newStudentForm, roll_no: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-bold uppercase focus:ring-2 focus:ring-sky-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Enrollment No *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. 1039954703"
+                      value={newStudentForm.enrollment_no}
+                      onChange={(e) => setNewStudentForm({ ...newStudentForm, enrollment_no: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-bold uppercase focus:ring-2 focus:ring-sky-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Document No *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. DN-3765"
+                      value={newStudentForm.serial_no}
+                      onChange={(e) => setNewStudentForm({ ...newStudentForm, serial_no: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-bold uppercase focus:ring-2 focus:ring-sky-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Course *</label>
+                    <select
+                      value={newStudentForm.course_name}
+                      onChange={(e) => setNewStudentForm({ ...newStudentForm, course_name: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-sky-500"
+                    >
+        
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Admission Date *</label>
+                    <input
+                      type="date"
+                      required
+                      value={newStudentForm.admission_date}
+                      onChange={(e) => setNewStudentForm({ ...newStudentForm, admission_date: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-sky-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Session (e.g. 2025-2027) *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="2025-2027"
+                      value={newStudentForm.session}
+                      onChange={(e) => setNewStudentForm({ ...newStudentForm, session: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-sky-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Student Name *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Candidate Full Name"
+                      value={newStudentForm.student_name}
+                      onChange={(e) => setNewStudentForm({ ...newStudentForm, student_name: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-bold uppercase focus:ring-2 focus:ring-sky-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Father's Name *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Father Full Name"
+                      value={newStudentForm.father_name}
+                      onChange={(e) => setNewStudentForm({ ...newStudentForm, father_name: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-bold uppercase focus:ring-2 focus:ring-sky-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Mother's Name *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Mother Full Name"
+                      value={newStudentForm.mother_name}
+                      onChange={(e) => setNewStudentForm({ ...newStudentForm, mother_name: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-bold uppercase focus:ring-2 focus:ring-sky-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">DOB *</label>
+                    <input
+                      type="date"
+                      required
+                      value={newStudentForm.dob}
+                      onChange={(e) => setNewStudentForm({ ...newStudentForm, dob: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-sky-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Qualification *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. 12th Pass, Graduate"
+                      value={newStudentForm.qualification}
+                      onChange={(e) => setNewStudentForm({ ...newStudentForm, qualification: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-sky-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Mobile No (10 Digits) *</label>
+                    <input
+                      type="text"
+                      required
+                      maxLength={10}
+                      placeholder="10 digit mobile"
+                      value={newStudentForm.mobile_no}
+                      onChange={(e) => setNewStudentForm({ ...newStudentForm, mobile_no: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-sky-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Alt Mobile No (Optional)</label>
+                    <input
+                      type="text"
+                      maxLength={10}
+                      placeholder="10 digit optional"
+                      value={newStudentForm.alt_mobile_no}
+                      onChange={(e) => setNewStudentForm({ ...newStudentForm, alt_mobile_no: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-sky-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Aadhar No (12 Digits) *</label>
+                    <input
+                      type="text"
+                      required
+                      maxLength={12}
+                      placeholder="12 digit Aadhar"
+                      value={newStudentForm.aadhar_no}
+                      onChange={(e) => setNewStudentForm({ ...newStudentForm, aadhar_no: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono font-bold focus:ring-2 focus:ring-sky-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Upload Photo (JPG/PNG &lt;= 200KB) *</label>
+                    <input
+                      type="file"
+                      required
+                      accept="image/jpeg,image/jpg,image/png"
+                      onChange={(e) => handlePhotoUpload(e, (url) => setNewStudentForm({ ...newStudentForm, photo_url: url }))}
+                      className="w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2 md:col-span-3 lg:col-span-4">
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Full Address *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Complete residential address"
+                      value={newStudentForm.address}
+                      onChange={(e) => setNewStudentForm({ ...newStudentForm, address: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-sky-500"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Mother's Name</label>
-                  <input
-                    type="text"
-                    value={singleStudent.mother_name}
-                    onChange={(e) => setSingleStudent({ ...singleStudent, mother_name: e.target.value })}
-                    placeholder="e.g. SUNITA CHUG"
-                    className="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-sky-500"
-                  />
+
+                <div className="flex justify-end pt-2">
+                  <button
+                    type="submit"
+                    className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow transition cursor-pointer"
+                  >
+                    ➕ Register Student & Save Record
+                  </button>
                 </div>
+              </form>
+            </div>
+
+            {/* Master Student Records Table */}
+            <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-md border border-slate-200 space-y-4">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b pb-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Course Name *</label>
-                  <input
-                    type="text"
-                    value={singleStudent.course_name}
-                    onChange={(e) => setSingleStudent({ ...singleStudent, course_name: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-sky-500"
-                    required
-                  />
+                  <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
+                    📋 Central Master Student Registry ({filteredStudents.length})
+                  </h3>
+                  <p className="text-xs text-slate-500">Includes all input data fields as columns with sort, search, and delete functions.</p>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Admission Date *</label>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  {/* Search Bar */}
                   <input
                     type="text"
-                    value={singleStudent.admission_date}
-                    onChange={(e) => setSingleStudent({ ...singleStudent, admission_date: e.target.value })}
-                    placeholder="e.g. 01.08.2025"
-                    className="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-sky-500"
-                    required
+                    value={studentSearch}
+                    onChange={(e) => setStudentSearch(e.target.value)}
+                    placeholder="🔍 Search Name, Roll, Enr, Course..."
+                    className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium bg-slate-50"
                   />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Date of Birth (DOB)</label>
-                  <input
-                    type="text"
-                    value={singleStudent.dob}
-                    onChange={(e) => setSingleStudent({ ...singleStudent, dob: e.target.value })}
-                    placeholder="e.g. 15.08.2005"
-                    className="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-sky-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Mobile No</label>
-                  <input
-                    type="text"
-                    value={singleStudent.mobile_no}
-                    onChange={(e) => setSingleStudent({ ...singleStudent, mobile_no: e.target.value })}
-                    placeholder="e.g. 9876543210"
-                    className="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-sky-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Photo URL</label>
-                  <input
-                    type="text"
-                    value={singleStudent.photo_url}
-                    onChange={(e) => setSingleStudent({ ...singleStudent, photo_url: e.target.value })}
-                    placeholder="Paste photo image link"
-                    className="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-sky-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Institute Name</label>
-                  <input
-                    type="text"
-                    value={singleStudent.institute_name}
-                    onChange={(e) => setSingleStudent({ ...singleStudent, institute_name: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded text-sm bg-slate-50"
-                  />
+
+                  {/* Sort Filter */}
+                  <select
+                    value={studentSortBy}
+                    onChange={(e) => setStudentSortBy(e.target.value as any)}
+                    className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-bold bg-white"
+                  >
+                    <option value="name">Sort by Name</option>
+                    <option value="session">Sort by Session</option>
+                    <option value="enrollment">Sort by Enrollment No</option>
+                  </select>
+
+                  {/* Bulk Delete Button */}
+                  {selectedStudentIds.length > 0 && (
+                    <button
+                      onClick={handleDeleteSelectedStudents}
+                      className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow transition"
+                    >
+                      🗑️ Delete Selected ({selectedStudentIds.length})
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => exportToExcel(filteredStudents, 'Student_Master_Records')}
+                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-lg shadow transition"
+                  >
+                    📥 Export Excel
+                  </button>
                 </div>
               </div>
 
-              <div className="flex justify-end pt-2">
+              {/* Table with ALL Input Headings */}
+              <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                <table className="w-full text-left text-xs text-slate-800">
+                  <thead className="bg-slate-900 text-white font-semibold">
+                    <tr>
+                      <th className="p-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedStudentIds.length === filteredStudents.length && filteredStudents.length > 0}
+                          onChange={(e) => {
+                            if (e.target.checked) setSelectedStudentIds(filteredStudents.map(s => s.id));
+                            else setSelectedStudentIds([]);
+                          }}
+                        />
+                      </th>
+                      <th className="p-3">Roll No</th>
+                      <th className="p-3">Enrollment No</th>
+                      <th className="p-3">Doc No</th>
+                      <th className="p-3">Student Name</th>
+                      <th className="p-3">Father's Name</th>
+                      <th className="p-3">Mother's Name</th>
+                      <th className="p-3">Course</th>
+                      <th className="p-3">Session</th>
+                      <th className="p-3">Admission Date</th>
+                      <th className="p-3">DOB</th>
+                      <th className="p-3">Qualification</th>
+                      <th className="p-3">Mobile No</th>
+                      <th className="p-3">Alt Mobile</th>
+                      <th className="p-3">Aadhar No</th>
+                      <th className="p-3">Photo</th>
+                      <th className="p-3">Address</th>
+                      <th className="p-3">Center</th>
+                      <th className="p-3 text-center">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {filteredStudents.map((s) => (
+                      <tr key={s.id} className="hover:bg-slate-50">
+                        <td className="p-3 text-center">
+                          <input
+                            type="checkbox"
+                            checked={selectedStudentIds.includes(s.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) setSelectedStudentIds([...selectedStudentIds, s.id]);
+                              else setSelectedStudentIds(selectedStudentIds.filter(id => id !== s.id));
+                            }}
+                          />
+                        </td>
+                        <td className="p-3 font-mono font-bold text-sky-800">{s.roll_no}</td>
+                        <td className="p-3 font-mono font-bold text-slate-900">{s.enrollment_no}</td>
+                        <td className="p-3 font-mono text-slate-600">{s.serial_no}</td>
+                        <td className="p-3 font-bold text-slate-900 uppercase">{s.student_name}</td>
+                        <td className="p-3 font-medium uppercase">{s.father_name}</td>
+                        <td className="p-3 text-slate-600 uppercase">{s.mother_name || 'N/A'}</td>
+                        <td className="p-3 font-medium">{s.course_name}</td>
+                        <td className="p-3 font-bold text-amber-800">{s.session}</td>
+                        <td className="p-3">{s.admission_date}</td>
+                        <td className="p-3">{s.dob || 'N/A'}</td>
+                        <td className="p-3">{s.qualification || 'N/A'}</td>
+                        <td className="p-3 font-mono">{s.mobile_no}</td>
+                        <td className="p-3 font-mono text-slate-500">{s.alt_mobile_no || '-'}</td>
+                        <td className="p-3 font-mono font-bold text-amber-900">{s.aadhar_no}</td>
+                        <td className="p-3">
+                          <img src={s.photo_url || 'https://iili.io/3jruEzl.md.jpg'} alt="Photo" className="w-8 h-8 rounded object-cover border border-slate-300" />
+                        </td>
+                        <td className="p-3 text-slate-600 max-w-xs truncate">{s.address}</td>
+                        <td className="p-3 text-slate-600 max-w-xs truncate">{s.study_center}</td>
+                        <td className="p-3 text-center">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              onClick={() => setEditingStudent(s)}
+                              className="px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 text-[10px] font-bold rounded border border-amber-300"
+                            >
+                              ✏️ Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteSingleStudent(s.id)}
+                              className="px-2 py-1 bg-rose-100 hover:bg-rose-200 text-rose-800 text-[10px] font-bold rounded border border-rose-300"
+                            >
+                              🗑️ Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB 4: ID CARD PRINTING (DEDICATED TAB WITH BLACK BORDER) */}
+        {/* ========================================================================= */}
+        {activeTab === 'idcards' && (
+          <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-md border border-slate-200 space-y-4">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b pb-4">
+              <div>
+                <h2 className="text-base font-bold text-slate-900 uppercase tracking-wide flex items-center gap-2">
+                  <span>📇</span> Student ID Card Printing Hub ({filteredIdCards.length})
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Dedicated tab featuring landscape ID cards with top 3 logos and crisp black borders.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <input
+                  type="text"
+                  value={idCardSearch}
+                  onChange={(e) => setIdCardSearch(e.target.value)}
+                  placeholder="🔍 Search Name, Roll, Branch..."
+                  className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium bg-slate-50"
+                />
+
+                <select
+                  value={idCardSortBy}
+                  onChange={(e) => setIdCardSortBy(e.target.value as any)}
+                  className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-bold bg-white"
+                >
+                  <option value="name">Sort by Name</option>
+                  <option value="session">Sort by Session</option>
+                  <option value="roll">Sort by Roll No</option>
+                </select>
+
+                {selectedIdCardIds.length > 0 && (
+                  <button
+                    onClick={() => {
+                      if (confirm(`Delete ${selectedIdCardIds.length} selected ID card records?`)) {
+                        setStudentsList(studentsList.filter(s => !selectedIdCardIds.includes(s.id)));
+                        setSelectedIdCardIds([]);
+                      }
+                    }}
+                    className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow transition"
+                  >
+                    🗑️ Delete Selected ({selectedIdCardIds.length})
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* ID Card Only Table */}
+            <div className="overflow-x-auto border border-slate-200 rounded-xl">
+              <table className="w-full text-left text-xs text-slate-800">
+                <thead className="bg-slate-900 text-white font-semibold">
+                  <tr>
+                    <th className="p-3 text-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedIdCardIds.length === filteredIdCards.length && filteredIdCards.length > 0}
+                        onChange={(e) => {
+                          if (e.target.checked) setSelectedIdCardIds(filteredIdCards.map(s => s.id));
+                          else setSelectedIdCardIds([]);
+                        }}
+                      />
+                    </th>
+                    <th className="p-3">Roll No</th>
+                    <th className="p-3">Enrollment No</th>
+                    <th className="p-3">Candidate Name</th>
+                    <th className="p-3">Father's Name</th>
+                    <th className="p-3">Course</th>
+                    <th className="p-3">Photo</th>
+                    <th className="p-3">Branch / Study Center</th>
+                    <th className="p-3 text-center">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {filteredIdCards.map((s) => (
+                    <tr key={s.id} className="hover:bg-slate-50">
+                      <td className="p-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedIdCardIds.includes(s.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) setSelectedIdCardIds([...selectedIdCardIds, s.id]);
+                            else setSelectedIdCardIds(selectedIdCardIds.filter(id => id !== s.id));
+                          }}
+                        />
+                      </td>
+                      <td className="p-3 font-mono font-bold text-sky-800">{s.roll_no}</td>
+                      <td className="p-3 font-mono font-bold text-slate-900">{s.enrollment_no}</td>
+                      <td className="p-3 font-bold text-slate-900 uppercase">{s.student_name}</td>
+                      <td className="p-3 font-medium uppercase">{s.father_name}</td>
+                      <td className="p-3 font-medium">{s.course_name}</td>
+                      <td className="p-3">
+                        <img src={s.photo_url || 'https://iili.io/3jruEzl.md.jpg'} alt="Photo" className="w-8 h-8 rounded object-cover border border-slate-300" />
+                      </td>
+                      <td className="p-3 text-slate-600 max-w-xs truncate">{s.study_center}</td>
+                      <td className="p-3 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            onClick={() => setViewingIdCardStudent(s)}
+                            className="px-2.5 py-1 bg-sky-100 hover:bg-sky-200 text-sky-800 text-[11px] font-bold rounded border border-sky-300 cursor-pointer"
+                          >
+                            👁️ View Card
+                          </button>
+                          <button
+                            onClick={() => printIDCard(s)}
+                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded shadow transition cursor-pointer"
+                          >
+                            🖨️ Print Card
+                          </button>
+                          <button
+                            onClick={() => handleDeleteSingleStudent(s.id)}
+                            className="px-2 py-1 bg-rose-100 hover:bg-rose-200 text-rose-800 text-[10px] font-bold rounded border border-rose-300"
+                          >
+                            🗑️ Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* ========================================================================= */}
+      {/* MODALS */}
+      {/* ========================================================================= */}
+
+      {/* 1. VIEW ID CARD MODAL (WITH BLACK BORDER) */}
+      {viewingIdCardStudent && (
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-4 border border-slate-200">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="font-bold text-slate-900 text-sm uppercase">👁️ ID Card Preview Modal</h3>
+              <button onClick={() => setViewingIdCardStudent(null)} className="text-slate-400 hover:text-slate-600 font-bold text-lg">✕</button>
+            </div>
+
+            {/* ID CARD CONTAINER WITH CRISP BLACK BORDER */}
+            <div className="p-4 bg-white rounded-xl border-2 border-black space-y-3 shadow-inner">
+              <div className="flex items-center justify-between border-b-2 border-black pb-2">
+                <img src="https://iili.io/3jruEzl.md.jpg" alt="Logo 1" className="h-8 object-contain" />
+                <div className="text-center">
+                  <div className="font-bold text-xs uppercase text-slate-900">MANAVTA INSTITUTE OF EDUCATION</div>
+                  <div className="text-[9px] text-slate-500">Regd. Govt. of India | MITM Campus</div>
+                </div>
+                <img src="https://iili.io/3jruEzl.md.jpg" alt="Logo 2" className="h-8 object-contain" />
+              </div>
+
+              <div className="flex items-start gap-4 pt-1">
+                <img src={viewingIdCardStudent.photo_url || 'https://iili.io/3jruEzl.md.jpg'} alt="Student" className="w-24 h-28 object-cover rounded-lg border-2 border-black flex-shrink-0" />
+                <div className="text-xs space-y-1 text-slate-800">
+                  <div><span className="font-bold text-slate-900">Name:</span> <strong className="uppercase">{viewingIdCardStudent.student_name}</strong></div>
+                  <div><span className="font-bold text-slate-900">Father's Name:</span> {viewingIdCardStudent.father_name}</div>
+                  <div><span className="font-bold text-slate-900">Roll No:</span> <span className="font-mono font-bold text-sky-800">{viewingIdCardStudent.roll_no}</span></div>
+                  <div><span className="font-bold text-slate-900">Enrollment No:</span> <span className="font-mono">{viewingIdCardStudent.enrollment_no}</span></div>
+                  <div><span className="font-bold text-slate-900">Course:</span> {viewingIdCardStudent.course_name}</div>
+                  <div><span className="font-bold text-slate-900">Session:</span> {viewingIdCardStudent.session}</div>
+                </div>
+              </div>
+
+              <div className="flex items-end justify-between border-t pt-2 text-[10px]">
+                <div>
+                  <div className="text-slate-500">Study Center:</div>
+                  <strong className="text-slate-900">{viewingIdCardStudent.study_center}</strong>
+                </div>
+                <div className="text-center">
+                  <div className="font-bold border-t border-black pt-0.5 mt-4">Authorised Signatory</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => setViewingIdCardStudent(null)}
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-lg"
+              >
+                Close Preview
+              </button>
+              <button
+                onClick={() => {
+                  printIDCard(viewingIdCardStudent);
+                  setViewingIdCardStudent(null);
+                }}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow"
+              >
+                🖨️ Print Landscape Card
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2. QUEUE ASSIGN ROLL & ENROLLMENT MODAL */}
+      {assigningStudent && (
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
+            <h3 className="font-bold text-slate-900 text-sm uppercase border-b pb-2">⚡ Issue Credentials & Merge to Master Records</h3>
+            
+            <div className="text-xs space-y-1 bg-slate-50 p-3 rounded-lg border">
+              <div><strong>Student Name:</strong> {assigningStudent.student_name}</div>
+              <div><strong>Father Name:</strong> {assigningStudent.father_name}</div>
+              <div><strong>Branch Code:</strong> {assigningStudent.branch_code}</div>
+              <div><strong>Course:</strong> {assigningStudent.course_name}</div>
+            </div>
+
+            <form onSubmit={handleAssignSingleStudent} className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Assign Roll No *</label>
+                <input
+                  type="text"
+                  required
+                  value={assignRoll}
+                  onChange={(e) => setAssignRoll(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-bold uppercase"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Assign Enrollment No *</label>
+                <input
+                  type="text"
+                  required
+                  value={assignEnrollment}
+                  onChange={(e) => setAssignEnrollment(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-bold uppercase"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setAssigningStudent(null)}
+                  className="px-4 py-2 bg-slate-200 text-slate-700 text-xs font-bold rounded-lg"
+                >
+                  Cancel
+                </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs rounded shadow transition cursor-pointer"
+                  className="px-4 py-2 bg-sky-600 text-white text-xs font-bold rounded-lg shadow"
                 >
-                  Save Student Admission Entry
+                  Issue & Merge
                 </button>
               </div>
             </form>
-
-            {/* Bulk Upload CSV Section */}
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-3">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div>
-                  <h4 className="font-bold text-sm text-slate-800">📁 Bulk Upload Admission Details via Excel / CSV</h4>
-                  <p className="text-xs text-slate-500">Upload your student admission records CSV file matching form columns.</p>
-                </div>
-                <button
-                  onClick={downloadAdmissionTemplate}
-                  className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded shadow transition cursor-pointer"
-                >
-                  📥 Download Sample CSV
-                </button>
-              </div>
-
-              <input
-                type="file"
-                accept=".csv, .xlsx, .xls"
-                onChange={handleAdmissionExcelUpload}
-                className="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-sky-600 file:text-white hover:file:bg-sky-700 cursor-pointer"
-              />
-            </div>
-
-            {/* Registered Students Table & ID Card Preview Button */}
-            <div className="space-y-4 pt-4">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-                <h4 className="font-bold text-sm text-slate-800 uppercase">📋 Registered Students List ({studentsList.length})</h4>
-                <input
-                  type="text"
-                  value={admissionSearch}
-                  onChange={(e) => setAdmissionSearch(e.target.value)}
-                  placeholder="🔍 Search by Name, Enrollment No..."
-                  className="px-3 py-1.5 border border-slate-300 rounded text-xs w-full sm:w-64 focus:ring-2 focus:ring-sky-500"
-                />
-              </div>
-
-              <div className="overflow-x-auto border border-slate-200 rounded-lg shadow-sm">
-                <table className="w-full text-left text-xs text-slate-800">
-                  <thead className="bg-slate-900 text-white font-semibold">
-                    <tr>
-                      <th className="p-2.5">Enrollment No</th>
-                      <th className="p-2.5">Roll No</th>
-                      <th className="p-2.5">Student Name</th>
-                      <th className="p-2.5">Father Name</th>
-                      <th className="p-2.5">Course</th>
-                      <th className="p-2.5">Admission Date</th>
-                      <th className="p-2.5 text-center">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200">
-                    {studentsList
-                      .filter(s => 
-                        s.student_name.toLowerCase().includes(admissionSearch.toLowerCase()) ||
-                        s.enrollment_no.includes(admissionSearch)
-                      )
-                      .map((student) => (
-                        <tr key={student.enrollment_no} className="hover:bg-slate-50 transition">
-                          <td className="p-2.5 font-bold text-sky-700">{student.enrollment_no}</td>
-                          <td className="p-2.5">{student.roll_no || '-'}</td>
-                          <td className="p-2.5 font-semibold text-slate-900">{student.student_name}</td>
-                          <td className="p-2.5">{student.father_name}</td>
-                          <td className="p-2.5">{student.course_name}</td>
-                          <td className="p-2.5">{student.admission_date}</td>
-                          <td className="p-2.5 text-center">
-                            <button
-                              onClick={() => setSelectedStudentForID(student)}
-                              className="px-3 py-1 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded text-[11px] shadow transition cursor-pointer"
-                            >
-                              🖨️ View & Print ID Card
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-          </div>
-        )}
-
-        {/* TAB 2: MARKSHEET UPLOAD & GENERATION */}
-        {activeTab === 'marksheets' && (
-          <div className="bg-white p-6 sm:p-8 rounded-b-xl shadow-md border border-t-0 border-slate-200 space-y-8 no-print">
-            
-            {marksheetStatus && (
-              <div className={`p-4 rounded-lg border text-sm font-semibold ${
-                marksheetStatus.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800'
-              }`}>
-                {marksheetStatus.msg}
-              </div>
-            )}
-
-            {/* NO FORM - Direct Bulk Upload Section ONLY */}
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 space-y-4">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b pb-4">
-                <div>
-                  <h3 className="text-base font-bold text-slate-800 uppercase tracking-wide">
-                    📁 Upload Student Marks Excel / CSV File
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    No form filling required! Directly upload your Excel/CSV file containing subject marks breakdown to generate marksheets.
-                  </p>
-                </div>
-                <button
-                  onClick={downloadMarksheetTemplate}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded shadow transition cursor-pointer flex items-center gap-1.5"
-                >
-                  📥 Download Marksheet Excel Template
-                </button>
-              </div>
-
-              <input
-                type="file"
-                accept=".csv, .xlsx, .xls"
-                onChange={handleMarksheetExcelUpload}
-                className="block w-full text-xs text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-sky-600 file:text-white hover:file:bg-sky-700 cursor-pointer"
-              />
-            </div>
-
-            {/* Generated Marksheets List */}
-            <div className="space-y-4 pt-2">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-                <h4 className="font-bold text-sm text-slate-800 uppercase">📋 Generated Student Marksheets ({marksheetsList.length})</h4>
-                <input
-                  type="text"
-                  value={marksheetSearch}
-                  onChange={(e) => setMarksheetSearch(e.target.value)}
-                  placeholder="🔍 Search Marksheet..."
-                  className="px-3 py-1.5 border border-slate-300 rounded text-xs w-full sm:w-64 focus:ring-2 focus:ring-sky-500"
-                />
-              </div>
-
-              <div className="overflow-x-auto border border-slate-200 rounded-lg shadow-sm">
-                <table className="w-full text-left text-xs text-slate-800">
-                  <thead className="bg-slate-900 text-white font-semibold">
-                    <tr>
-                      <th className="p-2.5">Roll No</th>
-                      <th className="p-2.5">Enrollment No</th>
-                      <th className="p-2.5">Candidate Name</th>
-                      <th className="p-2.5">Course Name</th>
-                      <th className="p-2.5">Total Marks</th>
-                      <th className="p-2.5">Grade</th>
-                      <th className="p-2.5 text-center">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200">
-                    {marksheetsList
-                      .filter(m => 
-                        m.student_name.toLowerCase().includes(marksheetSearch.toLowerCase()) ||
-                        m.enrollment_no.includes(marksheetSearch) ||
-                        m.roll_no.includes(marksheetSearch)
-                      )
-                      .map((m) => (
-                        <tr key={m.enrollment_no} className="hover:bg-slate-50 transition">
-                          <td className="p-2.5 font-mono font-bold text-slate-900">{m.roll_no}</td>
-                          <td className="p-2.5 font-bold text-sky-700">{m.enrollment_no}</td>
-                          <td className="p-2.5 font-semibold text-slate-900">{m.student_name}</td>
-                          <td className="p-2.5">{m.course_name}</td>
-                          <td className="p-2.5 font-bold text-emerald-700">{m.grand_total_obtained} / {m.grand_total_max}</td>
-                          <td className="p-2.5 font-bold text-slate-900">{m.grade}</td>
-                          <td className="p-2.5 text-center">
-                            <button
-                              onClick={() => setSelectedMarksheetForPrint(m)}
-                              className="px-3 py-1 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded text-[11px] shadow transition cursor-pointer"
-                            >
-                              🖨️ View & Print Marksheet
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-          </div>
-        )}
-
-        {/* TAB 3: CERTIFICATE UPLOAD & GENERATION */}
-        {activeTab === 'certificates' && (
-          <div className="bg-white p-6 sm:p-8 rounded-b-xl shadow-md border border-t-0 border-slate-200 space-y-8 no-print">
-            
-            {certificateStatus && (
-              <div className={`p-4 rounded-lg border text-sm font-semibold ${
-                certificateStatus.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800'
-              }`}>
-                {certificateStatus.msg}
-              </div>
-            )}
-
-            {/* NO FORM - Direct Bulk Upload Section ONLY */}
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 space-y-4">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b pb-4">
-                <div>
-                  <h3 className="text-base font-bold text-slate-800 uppercase tracking-wide">
-                    📁 Upload Student Certificate Excel / CSV File
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    No form filling required! Directly upload your Excel/CSV file to generate student course completion certificates.
-                  </p>
-                </div>
-                <button
-                  onClick={downloadCertificateTemplate}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded shadow transition cursor-pointer flex items-center gap-1.5"
-                >
-                  📥 Download Certificate Excel Template
-                </button>
-              </div>
-
-              <input
-                type="file"
-                accept=".csv, .xlsx, .xls"
-                onChange={handleCertificateExcelUpload}
-                className="block w-full text-xs text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-sky-600 file:text-white hover:file:bg-sky-700 cursor-pointer"
-              />
-            </div>
-
-            {/* Generated Certificates List */}
-            <div className="space-y-4 pt-2">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-                <h4 className="font-bold text-sm text-slate-800 uppercase">📋 Generated Student Certificates ({certificatesList.length})</h4>
-                <input
-                  type="text"
-                  value={certSearch}
-                  onChange={(e) => setCertSearch(e.target.value)}
-                  placeholder="🔍 Search Certificate..."
-                  className="px-3 py-1.5 border border-slate-300 rounded text-xs w-full sm:w-64 focus:ring-2 focus:ring-sky-500"
-                />
-              </div>
-
-              <div className="overflow-x-auto border border-slate-200 rounded-lg shadow-sm">
-                <table className="w-full text-left text-xs text-slate-800">
-                  <thead className="bg-slate-900 text-white font-semibold">
-                    <tr>
-                      <th className="p-2.5">Roll No</th>
-                      <th className="p-2.5">Enrollment No</th>
-                      <th className="p-2.5">Student Name</th>
-                      <th className="p-2.5">Course Name</th>
-                      <th className="p-2.5">Serial No</th>
-                      <th className="p-2.5">Grade</th>
-                      <th className="p-2.5 text-center">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200">
-                    {certificatesList
-                      .filter(c => 
-                        c.student_name.toLowerCase().includes(certSearch.toLowerCase()) ||
-                        c.enrollment_no.includes(certSearch) ||
-                        c.roll_no.includes(certSearch)
-                      )
-                      .map((c) => (
-                        <tr key={c.enrollment_no} className="hover:bg-slate-50 transition">
-                          <td className="p-2.5 font-mono font-bold text-slate-900">{c.roll_no}</td>
-                          <td className="p-2.5 font-bold text-sky-700">{c.enrollment_no}</td>
-                          <td className="p-2.5 font-semibold text-slate-900">{c.student_name}</td>
-                          <td className="p-2.5">{c.course_name}</td>
-                          <td className="p-2.5 font-mono text-amber-700 font-bold">{c.serial_no}</td>
-                          <td className="p-2.5 font-bold text-slate-900">{c.grade}</td>
-                          <td className="p-2.5 text-center">
-                            <button
-                              onClick={() => setSelectedCertForPrint(c)}
-                              className="px-3 py-1 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded text-[11px] shadow transition cursor-pointer"
-                            >
-                              🖨️ View & Print Certificate
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-          </div>
-        )}
-
-      </div>
-
-      {/* ========================================================================= */}
-      {/* 📜 PRINT PREVIEW MODALS */}
-      {/* ========================================================================= */}
-
-      {/* 1. STUDENT ID CARD PRINT PREVIEW MODAL */}
-      {selectedStudentForID && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 overflow-y-auto no-print">
-          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl my-8 relative">
-            <div className="flex justify-between items-center border-b pb-3 no-print">
-              <h3 className="text-base font-bold text-slate-800">🖨️ Student ID Card Print Preview</h3>
-              <button
-                onClick={() => setSelectedStudentForID(null)}
-                className="text-slate-400 hover:text-slate-600 font-bold text-lg cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* PRINTABLE ID CARD CONTAINER */}
-            <div id="printable-card" className="bg-white border border-slate-200 shadow-md rounded-xl p-6 text-slate-900 font-sans">
-              {/* Header 3 Logos */}
-              <div className="flex items-center justify-center gap-4 border-b pb-4 mb-6">
-                <img src="/mitm-logo.png" alt="MITM Emblem" className="h-16 object-contain" />
-                <img src="/manavta-text-logo.png" alt="MANAVTA" className="h-12 object-contain" />
-                <img src="/iso-certified-badge.png" alt="ISO" className="h-16 object-contain" />
-              </div>
-
-              {/* Grid: Details Left, Photo Right */}
-              <div className="grid grid-cols-12 gap-4 items-start">
-                <div className="col-span-8 space-y-3 text-sm">
-                  <div className="grid grid-cols-12"><span className="col-span-5 font-bold">Enrollment No:</span><span className="col-span-7">{selectedStudentForID.enrollment_no}</span></div>
-                  <div className="grid grid-cols-12"><span className="col-span-5 font-bold">Course:</span><span className="col-span-7">{selectedStudentForID.course_name}</span></div>
-                  <div className="grid grid-cols-12"><span className="col-span-5 font-bold">Name:</span><span className="col-span-7 font-bold text-slate-900">{selectedStudentForID.student_name}</span></div>
-                  <div className="grid grid-cols-12"><span className="col-span-5 font-bold">Fathers Name:</span><span className="col-span-7">{selectedStudentForID.father_name}</span></div>
-                  <div className="grid grid-cols-12"><span className="col-span-5 font-bold">Addmission Date:</span><span className="col-span-7">{selectedStudentForID.admission_date}</span></div>
-                  <div className="grid grid-cols-12"><span className="col-span-5 font-bold">Institute Name:</span><span className="col-span-7">{selectedStudentForID.institute_name}</span></div>
-                </div>
-
-                <div className="col-span-4 flex flex-col items-center justify-center">
-                  <div className="w-28 h-32 border border-slate-300 p-0.5 bg-white shadow-sm overflow-hidden mb-3">
-                    <img src={selectedStudentForID.photo_url || '/student-placeholder.jpg'} alt="" className="w-full h-full object-cover" />
-                  </div>
-                  <div className="text-center pt-2 border-t border-slate-300 w-full flex flex-col items-center">
-                    <img src="/authorised-signature.png" alt="Signatory" className="h-8 object-contain mb-0.5" />
-                    <span className="text-[11px] font-bold text-slate-800">Authorised Signatory</span>
-                    <span className="text-[9px] text-slate-500">Manavta Institute</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 pt-3 border-t no-print">
-              <button
-                onClick={() => setSelectedStudentForID(null)}
-                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold rounded text-xs transition cursor-pointer"
-              >
-                Close
-              </button>
-              <button
-                onClick={triggerPrint}
-                className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded text-xs shadow transition cursor-pointer flex items-center gap-1.5"
-              >
-                🖨️ Print ID Card
-              </button>
-            </div>
           </div>
         </div>
       )}
 
-      {/* 2. STUDENT MARKSHEET PRINT PREVIEW MODAL */}
-      {selectedMarksheetForPrint && (
-        <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-50 overflow-y-auto no-print">
-          <div className="bg-white rounded-2xl max-w-4xl w-full p-6 space-y-4 shadow-2xl my-8 relative max-h-[90vh] overflow-y-auto">
-            
-            {/* Modal Controls Bar */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b pb-3 no-print">
-              <div>
-                <h3 className="text-base font-bold text-slate-800">🖨️ Student Marksheet Print Preview</h3>
-                <label className="flex items-center gap-2 mt-1 cursor-pointer text-xs font-semibold text-sky-700 bg-sky-50 px-2.5 py-1 rounded border border-sky-200">
+      {/* 3. EDIT STUDENT MODAL */}
+      {editingStudent && (
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b pb-2">
+              <h3 className="font-bold text-slate-900 text-sm uppercase">✏️ Edit Student Master Record</h3>
+              <button onClick={() => setEditingStudent(null)} className="text-slate-400 font-bold">✕</button>
+            </div>
+
+            <form onSubmit={handleUpdateStudent} className="space-y-3 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold">Student Name</label>
                   <input
-                    type="checkbox"
-                    checked={isLetterhead}
-                    onChange={(e) => setIsLetterhead(e.target.checked)}
-                    className="rounded text-sky-600 focus:ring-sky-500"
+                    type="text"
+                    value={editingStudent.student_name}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, student_name: e.target.value })}
+                    className="w-full px-2 py-1.5 border rounded font-bold uppercase"
                   />
-                  <span>📄 Print on Pre-Printed Letterhead (Leave Top Margin & Hide Header Logos)</span>
-                </label>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={triggerPrint}
-                  className="px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded text-xs shadow transition cursor-pointer flex items-center gap-1.5"
-                >
-                  🖨️ Print Marksheet
-                </button>
-                <button
-                  onClick={() => setSelectedMarksheetForPrint(null)}
-                  className="text-slate-400 hover:text-slate-600 font-bold text-lg px-2 cursor-pointer"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-
-            {/* PRINTABLE MARKSHEET CONTAINER */}
-            <div 
-              id="printable-marksheet" 
-              className={`bg-white border border-slate-300 p-6 sm:p-8 text-slate-900 font-sans relative ${
-                isLetterhead ? 'letterhead-mode' : ''
-              }`}
-            >
-              {/* Header 3 Logos & Title (Hidden if Letterhead mode) */}
-              <div className={`text-center space-y-2 mb-4 border-b pb-4 ${isLetterhead ? 'hide-on-letterhead' : ''}`}>
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <img src="/mitm-logo.png" alt="MITM Emblem" className="h-14 object-contain" />
-                  <img src="/manavta-text-logo.png" alt="MANAVTA" className="h-10 object-contain" />
-                  <img src="/iso-certified-badge.png" alt="ISO" className="h-14 object-contain" />
                 </div>
-                <h2 className="text-2xl font-black tracking-wide uppercase border-b-2 border-slate-900 inline-block pb-0.5">
-                  STATEMENT OF MARKS
-                </h2>
-              </div>
-
-              {/* Candidate Info Grid */}
-              <div className="space-y-1.5 text-xs sm:text-sm font-semibold border-b pb-3 mb-4">
-                <div className="grid grid-cols-12"><span className="col-span-4 uppercase text-slate-600">PROGRAMME NAME:</span><span className="col-span-8 font-bold text-slate-900">{selectedMarksheetForPrint.course_name}</span></div>
-                <div className="grid grid-cols-12">
-                  <span className="col-span-4 uppercase text-slate-600">ROLL NO:</span>
-                  <span className="col-span-4 font-bold text-slate-900">{selectedMarksheetForPrint.roll_no}</span>
-                  <span className="col-span-4 text-right font-mono font-bold text-amber-800">{selectedMarksheetForPrint.serial_no}</span>
-                </div>
-                <div className="grid grid-cols-12"><span className="col-span-4 uppercase text-slate-600">ENROLLMENT NO:</span><span className="col-span-8 font-bold text-slate-900">{selectedMarksheetForPrint.enrollment_no}</span></div>
-                <div className="grid grid-cols-12"><span className="col-span-4 uppercase text-slate-600">NAME OF CANDIDATE:</span><span className="col-span-8 font-bold text-slate-900 uppercase">{selectedMarksheetForPrint.student_name}</span></div>
-                <div className="grid grid-cols-12"><span className="col-span-4 uppercase text-slate-600">FATHERS NAME:</span><span className="col-span-8 font-bold text-slate-900 uppercase">{selectedMarksheetForPrint.father_name}</span></div>
-                <div className="grid grid-cols-12"><span className="col-span-4 uppercase text-slate-600">STUDY CENTER:</span><span className="col-span-8 font-bold text-slate-900">{selectedMarksheetForPrint.study_center}</span></div>
-                <div className="grid grid-cols-12"><span className="col-span-4 uppercase text-slate-600">SESSION:</span><span className="col-span-8 font-bold text-slate-900">{selectedMarksheetForPrint.session}</span></div>
-              </div>
-
-              {/* Subject Breakdown Table */}
-              <table className="w-full border-collapse border border-slate-900 text-center text-xs mb-4">
-                <thead>
-                  <tr className="bg-slate-100 font-bold border-b border-slate-900 uppercase">
-                    <th className="border border-slate-900 p-2 text-left">PAPER CODE</th>
-                    <th className="border border-slate-900 p-2 text-left">COURSE NAME</th>
-                    <th className="border border-slate-900 p-2">MAX. MARKS</th>
-                    <th className="border border-slate-900 p-2">THEORY</th>
-                    <th className="border border-slate-900 p-2">PRACTICAL</th>
-                    <th className="border border-slate-900 p-2">TOTAL MARKS</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {selectedMarksheetForPrint.subjects.map((sub, idx) => (
-                    <tr key={idx} className="border-b border-slate-300">
-                      <td className="border border-slate-900 p-2 font-mono font-bold text-left">{sub.subject_code}</td>
-                      <td className="border border-slate-900 p-2 text-left font-semibold">{sub.subject_name}</td>
-                      <td className="border border-slate-900 p-2 font-bold">{sub.max_marks}</td>
-                      <td className="border border-slate-900 p-2">{sub.theory_marks}</td>
-                      <td className="border border-slate-900 p-2">{sub.practical_marks}</td>
-                      <td className="border border-slate-900 p-2 font-bold text-sky-800">{sub.total_marks}</td>
-                    </tr>
-                  ))}
-                  <tr className="bg-slate-100 font-bold border-t-2 border-slate-900 text-xs">
-                    <td colSpan={2} className="border border-slate-900 p-2 text-right uppercase">GRAND TOTAL =</td>
-                    <td className="border border-slate-900 p-2">{selectedMarksheetForPrint.grand_total_max}</td>
-                    <td colSpan={2} className="border border-slate-900 p-2">OBTAINED: {selectedMarksheetForPrint.grand_total_obtained}</td>
-                    <td className="border border-slate-900 p-2 font-bold text-emerald-800">{selectedMarksheetForPrint.grand_total_obtained}</td>
-                  </tr>
-                </tbody>
-              </table>
-
-              {/* Totals & Grade Bar */}
-              <div className="flex justify-between items-center border border-slate-900 p-2.5 font-bold text-xs bg-slate-50 mb-6">
-                <div>GRADE: <span className="text-base text-rose-700 ml-1">{selectedMarksheetForPrint.grade}</span></div>
-                <div>PERCENTAGE: <span className="text-base text-emerald-700 ml-1">{selectedMarksheetForPrint.percentage}%</span></div>
-              </div>
-
-              {/* Signatures + QR CODE Section */}
-              <div className="grid grid-cols-12 gap-2 items-end pt-4 border-t border-slate-300">
-                {/* Left Signature */}
-                <div className="col-span-4 text-center space-y-1">
-                  <img src="/authorised-signature.png" alt="Director Sign" className="h-10 object-contain mx-auto" />
-                  <p className="text-xs font-bold text-slate-900 border-t border-slate-400 pt-1">Director (MITM BILARI)</p>
-                </div>
-
-                {/* Center VERIFICATION QR CODE */}
-                <div className="col-span-4 flex flex-col items-center justify-center text-center">
-                  <img 
-                    src={getQRCodeUrl(`https://manavta-institute-portal.vercel.app/verify?enrollment=${selectedMarksheetForPrint.enrollment_no}`)}
-                    alt="Verification QR Code" 
-                    className="w-20 h-20 border border-slate-300 p-1 bg-white shadow-sm mb-1"
-                  />
-                  <span className="text-[9px] font-mono font-bold text-slate-600">Scan to Verify Result</span>
-                  <span className="text-[8px] text-slate-400">Date: {selectedMarksheetForPrint.issue_date}</span>
-                </div>
-
-                {/* Right Signature */}
-                <div className="col-span-4 text-center space-y-1">
-                  <img src="/authorised-signature.png" alt="Exam Controller Sign" className="h-10 object-contain mx-auto" />
-                  <p className="text-xs font-bold text-slate-900 border-t border-slate-400 pt-1">Chief Exam Controller</p>
-                </div>
-              </div>
-
-              {/* Footer Grade Legend */}
-              <div className="mt-6 pt-2 border-t text-[10px] text-center font-bold text-slate-600 tracking-tight">
-                GRADE LEGEND-Ex:90% & over | A:80%-89% | B:70%-79% | C:60%-69% | D:40%-59% | F:Less than 40%(Fail)
-              </div>
-            </div>
-
-          </div>
-        </div>
-      )}
-
-      {/* 3. STUDENT CERTIFICATE PRINT PREVIEW MODAL */}
-      {selectedCertForPrint && (
-        <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-50 overflow-y-auto no-print">
-          <div className="bg-white rounded-2xl max-w-3xl w-full p-6 space-y-4 shadow-2xl my-8 relative max-h-[90vh] overflow-y-auto">
-            
-            {/* Modal Controls Bar */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b pb-3 no-print">
-              <div>
-                <h3 className="text-base font-bold text-slate-800">🖨️ Student Course Certificate Print Preview</h3>
-                <label className="flex items-center gap-2 mt-1 cursor-pointer text-xs font-semibold text-sky-700 bg-sky-50 px-2.5 py-1 rounded border border-sky-200">
+                <div>
+                  <label className="font-bold">Father's Name</label>
                   <input
-                    type="checkbox"
-                    checked={isLetterhead}
-                    onChange={(e) => setIsLetterhead(e.target.checked)}
-                    className="rounded text-sky-600 focus:ring-sky-500"
+                    type="text"
+                    value={editingStudent.father_name}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, father_name: e.target.value })}
+                    className="w-full px-2 py-1.5 border rounded font-bold uppercase"
                   />
-                  <span>📄 Print on Pre-Printed Letterhead (Leave Top Margin & Hide Header Logos)</span>
-                </label>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={triggerPrint}
-                  className="px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded text-xs shadow transition cursor-pointer flex items-center gap-1.5"
-                >
-                  🖨️ Print Certificate
-                </button>
-                <button
-                  onClick={() => setSelectedCertForPrint(null)}
-                  className="text-slate-400 hover:text-slate-600 font-bold text-lg px-2 cursor-pointer"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-
-            {/* PRINTABLE CERTIFICATE CONTAINER */}
-            <div 
-              id="printable-certificate" 
-              className={`bg-white border-4 border-amber-600 p-8 text-slate-900 font-serif relative shadow-inner ${
-                isLetterhead ? 'letterhead-mode' : ''
-              }`}
-            >
-              {/* Header 3 Logos & Title (Hidden if Letterhead mode) */}
-              <div className={`text-center space-y-3 mb-6 ${isLetterhead ? 'hide-on-letterhead' : ''}`}>
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <img src="/mitm-logo.png" alt="MITM Emblem" className="h-16 object-contain" />
-                  <img src="/manavta-text-logo.png" alt="MANAVTA" className="h-12 object-contain" />
-                  <img src="/iso-certified-badge.png" alt="ISO" className="h-16 object-contain" />
                 </div>
-              </div>
-
-              {/* Certificate Details Top Bar */}
-              <div className="flex flex-wrap items-center justify-between border-b-2 border-slate-800 pb-2 mb-6 text-xs sm:text-sm font-sans font-bold text-slate-800">
-                <div>Roll No. - <span className="text-slate-900">{selectedCertForPrint.roll_no}</span></div>
-                <div>Enrollment No. - <span className="text-slate-900">{selectedCertForPrint.enrollment_no}</span></div>
-                <div>Session - <span className="text-slate-900">{selectedCertForPrint.session}</span></div>
-                <div className="text-amber-800 font-mono">{selectedCertForPrint.serial_no}</div>
-              </div>
-
-              {/* Main CERTIFICATE Heading */}
-              <div className="text-center mb-8">
-                <h1 className="text-3xl sm:text-4xl font-black tracking-widest text-slate-900 uppercase border-b-2 border-amber-600 inline-block pb-1">
-                  CERTIFICATE
-                </h1>
-              </div>
-
-              {/* Certificate Award Text */}
-              <div className="text-center leading-relaxed text-base sm:text-lg font-medium space-y-4 px-4 my-8 text-slate-800">
-                <p>
-                  This certificate is awarded to{' '}
-                  <span className="font-bold text-slate-900 underline underline-offset-4 uppercase px-1">
-                    {selectedCertForPrint.student_name}
-                  </span>{' '}
-                  S/O{' '}
-                  <span className="font-bold text-slate-900 underline underline-offset-4 uppercase px-1">
-                    {selectedCertForPrint.father_name}
-                  </span>{' '}
-                  in recognition of successful completion of{' '}
-                  <span className="font-bold text-slate-900 underline underline-offset-4 uppercase px-1">
-                    {selectedCertForPrint.course_name}
-                  </span>{' '}
-                  conducted in our own campus from{' '}
-                  <span className="font-semibold text-slate-900">{selectedCertForPrint.start_date}</span> to{' '}
-                  <span className="font-semibold text-slate-900">{selectedCertForPrint.end_date}</span>.
-                </p>
-                <p className="text-lg font-bold text-slate-900 pt-2">
-                  His/Her performance was grade{' '}
-                  <span className="text-xl font-black text-rose-700 bg-amber-50 px-3 py-1 rounded border border-amber-300">
-                    {selectedCertForPrint.grade}
-                  </span>.
-                </p>
-              </div>
-
-              {/* Signatures + VERIFICATION QR CODE Section */}
-              <div className="grid grid-cols-12 gap-2 items-end pt-8 mt-12 border-t border-slate-300 font-sans">
-                {/* Left Signature */}
-                <div className="col-span-4 text-center space-y-1">
-                  <img src="/authorised-signature.png" alt="Director Sign" className="h-10 object-contain mx-auto" />
-                  <p className="text-xs font-bold text-slate-900 border-t border-slate-400 pt-1">Director ({selectedCertForPrint.institute_name})</p>
-                </div>
-
-                {/* Center VERIFICATION QR CODE */}
-                <div className="col-span-4 flex flex-col items-center justify-center text-center">
-                  <img 
-                    src={getQRCodeUrl(`https://manavta-institute-portal.vercel.app/verify?enrollment=${selectedCertForPrint.enrollment_no}`)}
-                    alt="Verification QR Code" 
-                    className="w-20 h-20 border border-slate-300 p-1 bg-white shadow-sm mb-1"
+                <div>
+                  <label className="font-bold">Roll No</label>
+                  <input
+                    type="text"
+                    value={editingStudent.roll_no}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, roll_no: e.target.value })}
+                    className="w-full px-2 py-1.5 border rounded font-bold"
                   />
-                  <span className="text-[9px] font-mono font-bold text-slate-600">Scan to Verify Certificate</span>
-                  <span className="text-[8px] text-slate-400">Issued: {selectedCertForPrint.issue_date}</span>
                 </div>
-
-                {/* Right Signature */}
-                <div className="col-span-4 text-center space-y-1">
-                  <img src="/authorised-signature.png" alt="Exam Controller Sign" className="h-10 object-contain mx-auto" />
-                  <p className="text-xs font-bold text-slate-900 border-t border-slate-400 pt-1">Chief Exam Controller</p>
+                <div>
+                  <label className="font-bold">Enrollment No</label>
+                  <input
+                    type="text"
+                    value={editingStudent.enrollment_no}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, enrollment_no: e.target.value })}
+                    className="w-full px-2 py-1.5 border rounded font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold">Course Name</label>
+                  <input
+                    type="text"
+                    value={editingStudent.course_name}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, course_name: e.target.value })}
+                    className="w-full px-2 py-1.5 border rounded"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold">Session</label>
+                  <input
+                    type="text"
+                    value={editingStudent.session}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, session: e.target.value })}
+                    className="w-full px-2 py-1.5 border rounded"
+                  />
                 </div>
               </div>
 
-              {/* Footer Grade Legend */}
-              <div className="mt-8 pt-2 border-t text-[10px] text-center font-sans font-bold text-slate-600 tracking-tight">
-                GRADE LEGEND-Ex:90% & over | A:80%-89% | B:70%-79% | C:60%-69% | D:40%-59% | F:Less than 40%(Fail)
+              <div className="flex justify-end gap-2 pt-2 border-t">
+                <button type="button" onClick={() => setEditingStudent(null)} className="px-4 py-2 bg-slate-200 text-slate-700 font-bold rounded">Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-sky-600 text-white font-bold rounded shadow">Save Changes</button>
               </div>
-            </div>
-
+            </form>
           </div>
         </div>
       )}
