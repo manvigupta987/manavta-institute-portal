@@ -239,8 +239,22 @@ export default function Menu() {
                       🎓 Admin Dashboard
                     </Link>
                     <Link 
-                      href="/admin/profile?tab=profile" 
+                      href="/admin/marksheet" 
                       className="block px-4 py-2 text-xs text-slate-700 hover:bg-sky-50 font-bold transition"
+                      onClick={() => setIsUserMenuOpen(false)}
+                    >
+                      🎓 Student Marksheet
+                    </Link>
+                    <Link 
+                      href="/admin/certificate" 
+                      className="block px-4 py-2 text-xs text-slate-700 hover:bg-sky-50 font-bold transition"
+                      onClick={() => setIsUserMenuOpen(false)}
+                    >
+                      🎓 Student Certificate
+                    </Link>
+                    <Link 
+                      href="/admin/profile?tab=profile" 
+                      className="blosck px-4 py-2 text-xs text-slate-700 hover:bg-sky-50 font-bold transition"
                       onClick={() => setIsUserMenuOpen(false)}
                     >
                       ⚙️ Edit Profile / Change Password

@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { text } from 'stream/consumers';
 
 // ============================================================================
 // DATA INTERFACES
@@ -46,9 +47,6 @@ export interface StudentRecord {
   branch_code?: string;
 }
 
-
-
-
 // Helper: Export to Excel/CSV
 const exportToExcel = (data: any[], filename: string) => {
   if (!data || !data.length) {
@@ -61,7 +59,6 @@ const exportToExcel = (data: any[], filename: string) => {
   data.forEach((row) => {
     const values = headers.map((header) => {
       const val = (row[header] === null || row[header] === undefined) ? '' : String(row[header]);
- 
       return `"${val.replace(/"/g, '""')}"`;
     });
     csvRows.push(values.join(','));
@@ -85,10 +82,6 @@ export default function MITMAdminMasterDashboard() {
 
   // Pre-printed Letterhead Toggle
   const [isLetterhead, setIsLetterhead] = useState(false);
-
-  // -------------------------------------------------------------------------
-  // INITIAL DATABASE STATES
-  // -------------------------------------------------------------------------
 
   // Tab 1: Branches Data
   const [branchesList, setBranchesList] = useState<BranchInstitute[]>([
@@ -216,11 +209,6 @@ export default function MITMAdminMasterDashboard() {
     }
   ]);
 
- 
-  // -------------------------------------------------------------------------
-  // FORM STATES & CONTROLS
-  // -------------------------------------------------------------------------
-
   // Tab 1: New Branch Form State
   const [newBranch, setNewBranch] = useState({
     institute_code: '',
@@ -289,9 +277,7 @@ export default function MITMAdminMasterDashboard() {
   const [assignRoll, setAssignRoll] = useState('');
   const [assignEnrollment, setAssignEnrollment] = useState('');
 
-  // -------------------------------------------------------------------------
-  // PHOTO UPLOAD VALIDATION HANDLER (JPG/PNG & <= 200KB)
-  // -------------------------------------------------------------------------
+  // PHOTO UPLOAD VALIDATION HANDLER (JPG/PNG <= 200KB)
   const handlePhotoUpload = (
     e: React.ChangeEvent<HTMLInputElement>,
     onSuccess: (base64Url: string) => void
@@ -299,7 +285,6 @@ export default function MITMAdminMasterDashboard() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Check Format (JPG / PNG)
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png'];
     if (!validTypes.includes(file.type)) {
       alert("❌ Photo must be in JPG or PNG format only!");
@@ -307,15 +292,13 @@ export default function MITMAdminMasterDashboard() {
       return;
     }
 
-    // Check Size (Max 200KB)
-    const maxSizeBytes = 200 * 1024; // 204,800 bytes
+    const maxSizeBytes = 200 * 1024;
     if (file.size > maxSizeBytes) {
       alert(`❌ Photo size exceeds 200KB limit! (Selected file size: ${(file.size / 1024).toFixed(1)}KB)`);
       e.target.value = '';
       return;
     }
 
-    // Convert to Base64
     const reader = new FileReader();
     reader.onload = (event) => {
       if (event.target?.result) {
@@ -325,9 +308,7 @@ export default function MITMAdminMasterDashboard() {
     reader.readAsDataURL(file);
   };
 
-  // -------------------------------------------------------------------------
-  // TAB 1 HANDLERS: BRANCH MANAGEMENT
-  // -------------------------------------------------------------------------
+  // TAB 1 HANDLERS
   const handleRegisterBranch = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newBranch.institute_code || !newBranch.institute_name || !newBranch.mobile_no || !newBranch.password) {
@@ -390,9 +371,7 @@ export default function MITMAdminMasterDashboard() {
     }
   };
 
-  // -------------------------------------------------------------------------
-  // TAB 2 HANDLERS: QUEUE & AUTO-ASSIGN
-  // -------------------------------------------------------------------------
+  // TAB 2 HANDLERS
   const handleAssignSingleStudent = (e: React.FormEvent) => {
     e.preventDefault();
     if (!assigningStudent || !assignRoll || !assignEnrollment) {
@@ -438,17 +417,14 @@ export default function MITMAdminMasterDashboard() {
     }
   };
 
-  // -------------------------------------------------------------------------
-  // TAB 3 HANDLERS: DIRECT STUDENT REGISTRATION
-  // -------------------------------------------------------------------------
-  const handleRegisterDirectStudent = (e: React.FormEvent) => {
+  // TAB 3 HANDLERS
+  const handleRegisterDirectStudent = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Required Field Validations
     if (!newStudentForm.roll_no || !newStudentForm.enrollment_no || !newStudentForm.serial_no ||
-        !newStudentForm.student_name || !newStudentForm.father_name || !newStudentForm.mother_name ||
-        !newStudentForm.dob || !newStudentForm.qualification || !newStudentForm.mobile_no ||
-        !newStudentForm.aadhar_no || !newStudentForm.address) {
+      !newStudentForm.student_name || !newStudentForm.father_name || !newStudentForm.mother_name ||
+      !newStudentForm.dob || !newStudentForm.qualification || !newStudentForm.mobile_no ||
+      !newStudentForm.aadhar_no || !newStudentForm.address) {
       alert("❌ All fields are compulsory EXCEPT Alt Mobile No!");
       return;
     }
@@ -469,7 +445,7 @@ export default function MITMAdminMasterDashboard() {
     }
 
     const studentRecord: StudentRecord = {
-      id: 's_' + Date.now(),
+      id: 's-' + Date.now(),
       roll_no: newStudentForm.roll_no.trim(),
       enrollment_no: newStudentForm.enrollment_no.trim(),
       serial_no: newStudentForm.serial_no.trim(),
@@ -493,7 +469,7 @@ export default function MITMAdminMasterDashboard() {
 
     setStudentsList([studentRecord, ...studentsList]);
 
-    // Reset Form
+
     setNewStudentForm({
       roll_no: '',
       enrollment_no: '',
@@ -544,11 +520,9 @@ export default function MITMAdminMasterDashboard() {
     }
   };
 
-    // -------------------------------------------------------------------------
-  // PRINT FUNCTIONS FOR ALL 3 DELIVERABLES
-  // -------------------------------------------------------------------------
-
-  // 1. ID CARD PRINT (WITH BLACK BORDER)
+  // =========================================================================
+  // PRINT FUNCTIONS FOR ID CARD (UPDATED WITH LANDSCAPE, 3 LOGOS, AADHAR SIZE ON A4)
+  // =========================================================================
   const printIDCard = (student: StudentRecord) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -557,160 +531,164 @@ export default function MITMAdminMasterDashboard() {
     }
 
     printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>ID Card - ${student.student_name}</title>
-          <style>
-            @page {
-              size: landscape;
-              margin: 10mm;
-            }
-            body {
-              font-family: Arial, sans-serif;
-              margin: 0;
-              padding: 20px;
-              display: flex;
-              justify-content: center;
-              align-items: center;
-              background-color: #ffffff;
-            }
-            /* ID CARD WITH CRISP BLACK BORDER */
-            .id-card-box {
-              width: 500px;
-              height: 310px;
-              border: 3px solid #000000; /* BLACK BORDER */
-              border-radius: 12px;
-              padding: 12px;
-              box-sizing: border-box;
-              background: #ffffff;
-              position: relative;
-              box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-              display: flex;
-              flex-direction: column;
-              justify-content: space-between;
-            }
-            .header-logos {
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-              border-bottom: 2px solid #000000;
-              padding-bottom: 6px;
-            }
-            .header-logos img {
-              height: 38px;
-              object-fit: contain;
-            }
-            .inst-title {
-              text-align: center;
-              font-size: 13px;
-              font-weight: bold;
-              color: #0f172a;
-              margin-top: 2px;
-              text-transform: uppercase;
-            }
-            .card-body {
-              display: flex;
-              gap: 12px;
-              margin-top: 8px;
-            }
-            .photo-box {
-              width: 100px;
-              height: 115px;
-              border: 2px solid #000000;
-              border-radius: 6px;
-              overflow: hidden;
-              flex-shrink: 0;
-            }
-            .photo-box img {
-              width: 100%;
-              height: 100%;
-              object-fit: cover;
-            }
-            .details-box {
-              flex: 1;
-              font-size: 11px;
-              line-height: 1.5;
-              color: #1e293b;
-            }
-            .details-box div {
-              margin-bottom: 3px;
-            }
-            .details-box span.label {
-              font-weight: bold;
-              color: #0f172a;
-              display: inline-block;
-              width: 105px;
-            }
-            .footer-sig {
-              display: flex;
-              justify-content: space-between;
-              align-items: flex-end;
-              border-top: 1px solid #cbd5e1;
-              padding-top: 4px;
-              font-size: 10px;
-            }
-            .sig-img {
-              height: 28px;
-              margin-bottom: 2px;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="id-card-box">
-            <div>
-              <div class="header-logos">
-                <img src="https://iili.io/3jruEzl.md.jpg" alt="Logo 1" />
-                <div class="inst-title">
-                  MANAVTA INSTITUTE OF EDUCATION
-                  <div style="font-size: 9px; color: #475569; font-weight: normal;">Regd. Govt. of India | MITM Campus</div>
-                </div>
-                <img src="https://iili.io/3jruEzl.md.jpg" alt="Logo 2" />
-              </div>
+<!DOCTYPE html>
+<html>
+<head>
+<title>ID Card - ${student.student_name}</title>
+<style>
+@page {
+  size: A4 portrait;
+  margin: 0;
+}
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  margin: 0;
+  padding: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  background-color: #ffffff;
+}
+@media print {
+  body {
+    padding: 15mm 0 0 0;
+  }
+  .id-card-box {
+    box-shadow: none !important;
+  }
+}
+/* ID CARD WITH EXACT AADHAR SIZE: 85.6mm x 53.9mm (LANDSCAPE) */
+.id-card-box {
+  width: 85.6mm;
+  height: 53.9mm;
+  border: 1.5px solid #000000;
+  border-radius: 4mm;
+  padding: 2.5mm 3mm;
+  box-sizing: border-box;
+  background: #ffffff;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+}
+.header-logos {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1.5px solid #0284c7;
+  padding-bottom: 1.5mm;
+  margin-bottom: 1.5mm;
+}
+.header-logos img {
+  height: 6mm;
+  object-fit: contain;
+}
+.header-logos img.logo-center {
+  height: 5.5mm;
+}
+.card-body {
+  display: flex;
+  gap: 2.5mm;
+  align-items: flex-start;
+  flex: 1;
+}
+.photo-box {
+  width: 13.5mm;
+  height: 16.5mm;
+  border: 1px solid #000000;
+  border-radius: 1.5mm;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: #f8fafc;
+}
+.photo-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.details-box {
+  flex: 1;
+  font-size: 6.5pt;
+  line-height: 1.25;
+  color: #0f172a;
+}
+.details-box div {
+  margin-bottom: 0.8mm;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.details-box span.label {
+  font-weight: 800;
+  color: #0284c7;
+  display: inline-block;
+  width: 19mm;
+  text-transform: uppercase;
+}
+.footer-sig {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 1mm;
+  font-size: 5.5pt;
+}
+.sig-img {
+  height: 4mm;
+  object-fit: contain;
+  margin-bottom: 0.5mm;
+}
+</style>
+</head>
+<body>
+<div class="id-card-box">
+  <div>
+    <div class="header-logos">
+      <img src="/mitm-logo.png" alt="MITM Logo" onError="this.src='https://iili.io/3jruEzl.md.jpg'" />
+      <img src="/manavta-text-logo.png" class="logo-center" alt="MANAVTA Text Logo" onError="this.style.display='none'" />
+      <img src="/iso-certified-badge.png" alt="ISO Badge" onError="this.src='https://iili.io/3jruEzl.md.jpg'" />
+    </div>
 
-              <div class="card-body">
-                <div class="photo-box">
-                  <img src="${student.photo_url || 'https://iili.io/3jruEzl.md.jpg'}" alt="Photo" />
-                </div>
-                <div class="details-box">
-                  <div><span class="label">Candidate Name:</span> <strong>${student.student_name}</strong></div>
-                  <div><span class="label">Father's Name:</span> ${student.father_name}</div>
-                  <div><span class="label">Roll Number:</span> <strong>${student.roll_no}</strong></div>
-                  <div><span class="label">Enrollment No:</span> ${student.enrollment_no}</div>
-                  <div><span class="label">Course:</span> ${student.course_name}</div>
-                  <div><span class="label">Session:</span> ${student.session}</div>
-                </div>
-              </div>
-            </div>
+    <div class="card-body">
+      <div class="photo-box">
+        <img src="${student.photo_url || 'https://iili.io/3jruEzl.md.jpg'}" alt="Photo" />
+      </div>
+      <div class="details-box">
+        <div><span class="label">Candidate:</span> <strong>${student.student_name}</strong></div>
+        <div><span class="label">Father:</span> ${student.father_name}</div>
+        <div><span class="label">Roll No:</span> <strong style="color:#0f172a;">${student.roll_no}</strong></div>
+        <div><span class="label">Enrollment:</span> <strong>${student.enrollment_no}</strong></div>
+        <div><span class="label">Course:</span> ${student.course_name}</div>
+        <div><span class="label">Session:</span> ${student.session}</div>
+      </div>
+    </div>
+  </div>
 
-            <div class="footer-sig">
-              <div>
-                <div style="font-size: 9px; color: #64748b;">Study Center:</div>
-                <strong>${student.study_center}</strong>
-              </div>
-              <div style="text-align: center;">
-                <img src="/authorised-signature.png" class="sig-img" alt="Sig" onError="this.style.display='none'" />
-                <div style="font-weight: bold; border-top: 1px solid #000; padding-top: 1px;">Authorised Signatory</div>
-              </div>
-            </div>
-          </div>
+  <div class="footer-sig">
+    <div style="max-width: 50mm; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+      <span style="color: #64748b; font-weight: bold;">Center:</span>
+      <strong>${student.study_center}</strong>
+    </div>
+    <div style="text-align: center;">
+      <img src="/authorised-signature.png" class="sig-img" alt="Sig" onError="this.style.display='none'" />
+      <div style="font-weight: bold; border-top: 1px solid #000; padding-top: 0.5mm; text-transform: uppercase;">Authorised Signatory</div>
+    </div>
+  </div>
+</div>
 
-          <script>
-            window.onload = function() {
-              window.print();
-            }
-          </script>
-        </body>
-      </html>
-    `);
+<script>
+window.onload = function() {
+  window.print();
+}
+</script>
+</body>
+</html>
+`);
     printWindow.document.close();
   };
 
-    // -------------------------------------------------------------------------
   // FILTERED & SORTED LISTS MEMO
-  // -------------------------------------------------------------------------
-
-  // Tab 3 Students List
   const filteredStudents = useMemo(() => {
     return studentsList
       .filter(s => {
@@ -733,7 +711,6 @@ export default function MITMAdminMasterDashboard() {
       });
   }, [studentsList, studentSearch, studentSortBy]);
 
-  // Tab 4 ID Cards List
   const filteredIdCards = useMemo(() => {
     return studentsList
       .filter(s => {
@@ -755,15 +732,11 @@ export default function MITMAdminMasterDashboard() {
       });
   }, [studentsList, idCardSearch, idCardSortBy]);
 
-    // =========================================================================
-  // MAIN RENDER
-  // =========================================================================
-
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800 font-sans pb-16">
-      
+
       {/* HEADER BAR */}
-      <header className="bg-slate-900 text-white shadow-lg sticky top-0 z-30 border-b border-slate-800">
+      <header className="bg-slate-800 mb-5 text-white shadow-lg sticky top-0 z-30 border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-sky-600 rounded-xl flex items-center justify-center font-black text-xl text-white shadow">
@@ -771,39 +744,28 @@ export default function MITMAdminMasterDashboard() {
             </div>
             <div>
               <h1 className="text-lg font-black tracking-wide uppercase text-white">
-                MITM Admin Portal (Head Office)
+                MITM Admin Portal
               </h1>
               <p className="text-xs text-sky-400 font-medium">
-                Manavta Institute of Education • Master Management Dashboard
+                Manavta Institute of Technology & Management
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Pre-printed Letterhead Toggle */}
-            <label className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg border border-slate-700 text-xs font-semibold cursor-pointer transition">
-              <input
-                type="checkbox"
-                checked={isLetterhead}
-                onChange={(e) => setIsLetterhead(e.target.checked)}
-                className="rounded border-slate-600 text-sky-500 focus:ring-sky-500"
-              />
-              <span>Pre-printed Letterhead Top Margin (48mm)</span>
-            </label>
-
             <button
               onClick={() => router.push('/')}
               className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow transition"
             >
-              🔒 Logout
+              🚪 Logout
             </button>
           </div>
         </div>
 
-        {/* TOP NAVIGATION TABS (6 TABS) */}
-        <div className="bg-slate-800 border-t border-slate-700/60 overflow-x-auto">
-          <div className="max-w-7xl mx-auto px-4 flex items-center gap-1 py-1.5 text-xs font-bold min-w-max">
-            
+        {/* TOP NAVIGATION TABS */}
+        <div className="bg-white border-t border-slate-700/60 overflow-x-auto">
+          <div className="max-w-7xl mx-auto px-4 flex mt-3 mb-3 items-center gap-3 py-1.5 text-xs font-bold min-w-max">
+
             <button
               onClick={() => setActiveTab('branches')}
               className={`px-4 py-2 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
@@ -837,7 +799,7 @@ export default function MITMAdminMasterDashboard() {
                 activeTab === 'idcards' ? 'bg-sky-600 text-white shadow' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
               }`}
             >
-              <span>📇</span> Tab 4: ID Card Print ({studentsList.length})
+              <span>🪪</span> Tab 4: ID Card Print ({studentsList.length})
             </button>
 
           </div>
@@ -847,13 +809,10 @@ export default function MITMAdminMasterDashboard() {
       {/* MAIN CONTENT CONTAINER */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-6">
 
-        {/* ========================================================================= */}
-        {/* TAB 1: REGISTER BRANCH INSTITUTES & DIRECTORY */}
-        {/* ========================================================================= */}
+        {/* TAB 1: REGISTER BRANCH INSTITUTES */}
         {activeTab === 'branches' && (
           <div className="space-y-6">
-            
-            {/* Branch Registration Form */}
+
             <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-md border border-slate-200">
               <h2 className="text-base font-bold text-slate-900 uppercase tracking-wide flex items-center gap-2 mb-4 border-b pb-3">
                 <span>🏛️</span> Register New Branch Institute
@@ -920,7 +879,6 @@ export default function MITMAdminMasterDashboard() {
                     />
                   </div>
 
-                  {/* BRANCH HEAD DETAILS (NEW FIELDS) */}
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">Branch Head Name</label>
                     <input
@@ -988,7 +946,6 @@ export default function MITMAdminMasterDashboard() {
               </form>
             </div>
 
-            {/* Registered Branches Directory Table */}
             <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-md border border-slate-200 space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
@@ -1067,9 +1024,7 @@ export default function MITMAdminMasterDashboard() {
           </div>
         )}
 
-        {/* ========================================================================= */}
-        {/* TAB 2: BRANCH SUBMISSIONS & QUEUE WITH DROPDOWN & SEARCH */}
-        {/* ========================================================================= */}
+        {/* TAB 2: BRANCH SUBMISSIONS & QUEUE */}
         {activeTab === 'queue' && (
           <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-md border border-slate-200 space-y-6">
             <div className="flex flex-col md:flex-row items-center justify-between gap-4 border-b pb-4">
@@ -1083,7 +1038,6 @@ export default function MITMAdminMasterDashboard() {
               </div>
 
               <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-                {/* 🔍 Search Input */}
                 <div className="relative flex-1 md:w-64">
                   <input
                     type="text"
@@ -1102,7 +1056,6 @@ export default function MITMAdminMasterDashboard() {
                   )}
                 </div>
 
-                {/* 🏛️ Branch Name Dropdown Select at Top */}
                 <select
                   value={selectedBranchFilter}
                   onChange={(e) => setSelectedBranchFilter(e.target.value)}
@@ -1125,7 +1078,6 @@ export default function MITMAdminMasterDashboard() {
               </div>
             </div>
 
-            {/* Queue Table */}
             <div className="overflow-x-auto border border-slate-200 rounded-xl shadow-sm">
               <table className="w-full text-left text-xs text-slate-800">
                 <thead className="bg-slate-900 text-white font-semibold">
@@ -1209,13 +1161,10 @@ export default function MITMAdminMasterDashboard() {
           </div>
         )}
 
-        {/* ========================================================================= */}
-        {/* TAB 3: STUDENT REGISTRATION (DIRECT ADMISSION & MASTER RECORD) */}
-        {/* ========================================================================= */}
+        {/* TAB 3: STUDENT REGISTRATION */}
         {activeTab === 'students' && (
           <div className="space-y-6">
-            
-            {/* Registration Form */}
+
             <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-md border border-slate-200">
               <h2 className="text-base font-bold text-slate-900 uppercase tracking-wide flex items-center gap-2 mb-4 border-b pb-3">
                 <span>📋</span> Direct Student Admission Form
@@ -1261,13 +1210,13 @@ export default function MITMAdminMasterDashboard() {
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">Course *</label>
-                    <select
+                    <input
+                      type="text"
+                      required
                       value={newStudentForm.course_name}
                       onChange={(e) => setNewStudentForm({ ...newStudentForm, course_name: e.target.value })}
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-sky-500"
-                    >
-        
-                    </select>
+                    />
                   </div>
 
                   <div>
@@ -1425,7 +1374,6 @@ export default function MITMAdminMasterDashboard() {
               </form>
             </div>
 
-            {/* Master Student Records Table */}
             <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-md border border-slate-200 space-y-4">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b pb-4">
                 <div>
@@ -1436,7 +1384,6 @@ export default function MITMAdminMasterDashboard() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
-                  {/* Search Bar */}
                   <input
                     type="text"
                     value={studentSearch}
@@ -1445,7 +1392,6 @@ export default function MITMAdminMasterDashboard() {
                     className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium bg-slate-50"
                   />
 
-                  {/* Sort Filter */}
                   <select
                     value={studentSortBy}
                     onChange={(e) => setStudentSortBy(e.target.value as any)}
@@ -1456,7 +1402,6 @@ export default function MITMAdminMasterDashboard() {
                     <option value="enrollment">Sort by Enrollment No</option>
                   </select>
 
-                  {/* Bulk Delete Button */}
                   {selectedStudentIds.length > 0 && (
                     <button
                       onClick={handleDeleteSelectedStudents}
@@ -1475,7 +1420,6 @@ export default function MITMAdminMasterDashboard() {
                 </div>
               </div>
 
-              {/* Table with ALL Input Headings */}
               <div className="overflow-x-auto border border-slate-200 rounded-xl">
                 <table className="w-full text-left text-xs text-slate-800">
                   <thead className="bg-slate-900 text-white font-semibold">
@@ -1567,18 +1511,16 @@ export default function MITMAdminMasterDashboard() {
           </div>
         )}
 
-        {/* ========================================================================= */}
-        {/* TAB 4: ID CARD PRINTING (DEDICATED TAB WITH BLACK BORDER) */}
-        {/* ========================================================================= */}
+        {/* TAB 4: ID CARD PRINTING (AADHAR SIZE LANDSCAPE WITH 3 LOGOS) */}
         {activeTab === 'idcards' && (
           <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-md border border-slate-200 space-y-4">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b pb-4">
               <div>
                 <h2 className="text-base font-bold text-slate-900 uppercase tracking-wide flex items-center gap-2">
-                  <span>📇</span> Student ID Card Printing Hub ({filteredIdCards.length})
+                  <span>🪪</span> Student ID Card Printing Hub ({filteredIdCards.length})
                 </h2>
                 <p className="text-xs text-slate-500">
-                  Dedicated tab featuring landscape ID cards with top 3 logos and crisp black borders.
+                  Dedicated tab featuring landscape ID cards with 3 header logos, formatted to exact Aadhar size (85.6mm × 53.9mm) when printed.
                 </p>
               </div>
 
@@ -1617,7 +1559,6 @@ export default function MITMAdminMasterDashboard() {
               </div>
             </div>
 
-            {/* ID Card Only Table */}
             <div className="overflow-x-auto border border-slate-200 rounded-xl">
               <table className="w-full text-left text-xs text-slate-800">
                 <thead className="bg-slate-900 text-white font-semibold">
@@ -1695,49 +1636,44 @@ export default function MITMAdminMasterDashboard() {
         )}
       </main>
 
-      {/* ========================================================================= */}
       {/* MODALS */}
-      {/* ========================================================================= */}
 
-      {/* 1. VIEW ID CARD MODAL (WITH BLACK BORDER) */}
+      {/* 1. VIEW ID CARD MODAL (UPDATED LANDSCAPE AADHAR SIZE WITH 3 LOGOS) */}
       {viewingIdCardStudent && (
         <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-4 border border-slate-200">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 border border-slate-200">
             <div className="flex items-center justify-between border-b pb-3">
-              <h3 className="font-bold text-slate-900 text-sm uppercase">👁️ ID Card Preview Modal</h3>
+              <h3 className="font-bold text-slate-900 text-sm uppercase">👁️ ID Card Preview Modal (Aadhar Size Landscape)</h3>
               <button onClick={() => setViewingIdCardStudent(null)} className="text-slate-400 hover:text-slate-600 font-bold text-lg">✕</button>
             </div>
 
-            {/* ID CARD CONTAINER WITH CRISP BLACK BORDER */}
-            <div className="p-4 bg-white rounded-xl border-2 border-black space-y-3 shadow-inner">
-              <div className="flex items-center justify-between border-b-2 border-black pb-2">
-                <img src="https://iili.io/3jruEzl.md.jpg" alt="Logo 1" className="h-8 object-contain" />
-                <div className="text-center">
-                  <div className="font-bold text-xs uppercase text-slate-900">MANAVTA INSTITUTE OF EDUCATION</div>
-                  <div className="text-[9px] text-slate-500">Regd. Govt. of India | MITM Campus</div>
-                </div>
-                <img src="https://iili.io/3jruEzl.md.jpg" alt="Logo 2" className="h-8 object-contain" />
+            {/* ID CARD CONTAINER WITH LANDSCAPE AADHAR SIZE & 3 LOGOS */}
+            <div className="p-3 bg-white rounded-xl border-2 border-slate-900 space-y-2 shadow-sm mx-auto" style={{ width: '320px', height: '200px' }}>
+              <div className="flex items-center justify-between border-b-2 border-sky-600 pb-1.5">
+                <img src="/mitm-logo.png" alt="Logo 1" className="h-6 object-contain" onError={(e: any) => e.target.src='https://iili.io/3jruEzl.md.jpg'} />
+                <img src="/manavta-text-logo.png" alt="MANAVTA Text" className="h-5 object-contain" onError={(e: any) => e.target.style.display='none'} />
+                <img src="/iso-certified-badge.png" alt="Logo 3" className="h-6 object-contain" onError={(e: any) => e.target.src='https://iili.io/3jruEzl.md.jpg'} />
               </div>
 
-              <div className="flex items-start gap-4 pt-1">
-                <img src={viewingIdCardStudent.photo_url || 'https://iili.io/3jruEzl.md.jpg'} alt="Student" className="w-24 h-28 object-cover rounded-lg border-2 border-black flex-shrink-0" />
-                <div className="text-xs space-y-1 text-slate-800">
-                  <div><span className="font-bold text-slate-900">Name:</span> <strong className="uppercase">{viewingIdCardStudent.student_name}</strong></div>
-                  <div><span className="font-bold text-slate-900">Father's Name:</span> {viewingIdCardStudent.father_name}</div>
-                  <div><span className="font-bold text-slate-900">Roll No:</span> <span className="font-mono font-bold text-sky-800">{viewingIdCardStudent.roll_no}</span></div>
-                  <div><span className="font-bold text-slate-900">Enrollment No:</span> <span className="font-mono">{viewingIdCardStudent.enrollment_no}</span></div>
-                  <div><span className="font-bold text-slate-900">Course:</span> {viewingIdCardStudent.course_name}</div>
-                  <div><span className="font-bold text-slate-900">Session:</span> {viewingIdCardStudent.session}</div>
+              <div className="flex items-start gap-2.5 pt-1">
+                <img src={viewingIdCardStudent.photo_url || 'https://iili.io/3jruEzl.md.jpg'} alt="Student" className="w-14 h-16 object-cover rounded border border-black flex-shrink-0" />
+                <div className="text-[10px] leading-tight space-y-1 text-slate-800">
+                  <div><span className="font-bold text-sky-700">NAME:</span> <strong className="uppercase">{viewingIdCardStudent.student_name}</strong></div>
+                  <div><span className="font-bold text-sky-700">FATHER:</span> {viewingIdCardStudent.father_name}</div>
+                  <div><span className="font-bold text-sky-700">ROLL NO:</span> <strong className="font-mono text-slate-900">{viewingIdCardStudent.roll_no}</strong></div>
+                  <div><span className="font-bold text-sky-700">ENROLLMENT:</span> <span className="font-mono">{viewingIdCardStudent.enrollment_no}</span></div>
+                  <div><span className="font-bold text-sky-700">COURSE:</span> {viewingIdCardStudent.course_name}</div>
+                  <div><span className="font-bold text-sky-700">SESSION:</span> {viewingIdCardStudent.session}</div>
                 </div>
               </div>
 
-              <div className="flex items-end justify-between border-t pt-2 text-[10px]">
-                <div>
-                  <div className="text-slate-500">Study Center:</div>
-                  <strong className="text-slate-900">{viewingIdCardStudent.study_center}</strong>
+              <div className="flex items-end justify-between border-t pt-1 text-[9px]">
+                <div className="truncate max-w-[170px]">
+                  <span className="text-slate-500 font-bold">Center:</span> <strong>{viewingIdCardStudent.study_center}</strong>
                 </div>
                 <div className="text-center">
-                  <div className="font-bold border-t border-black pt-0.5 mt-4">Authorised Signatory</div>
+                  <img src="/authorised-signature.png" className="h-3 object-contain mx-auto" alt="Sig" onError={(e: any) => e.target.style.display='none'} />
+                  <div className="font-bold border-t border-black pt-0.5 text-[8px] uppercase">Authorised Signatory</div>
                 </div>
               </div>
             </div>
@@ -1768,7 +1704,7 @@ export default function MITMAdminMasterDashboard() {
         <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
             <h3 className="font-bold text-slate-900 text-sm uppercase border-b pb-2">⚡ Issue Credentials & Merge to Master Records</h3>
-            
+
             <div className="text-xs space-y-1 bg-slate-50 p-3 rounded-lg border">
               <div><strong>Student Name:</strong> {assigningStudent.student_name}</div>
               <div><strong>Father Name:</strong> {assigningStudent.father_name}</div>

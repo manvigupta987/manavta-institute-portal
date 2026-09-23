@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
@@ -17,30 +17,33 @@ export async function POST(request: Request) {
       );
     }
 
-    // Query Supabase for student matching Name (case-insensitive) and DOB
+    const trimmedName = studentName.trim();
+    const trimmedDob = dob.trim();
+
+    // Query Supabase for student matching Name (case-insensitive partial match) and DOB
     const { data, error } = await supabase
       .from('students')
       .select('*')
-      .ilike('student_name', studentName.trim())
-      .eq('dob', dob.trim())
-      .maybeSingle();
+      .ilike('student_name', `%${trimmedName}%`)
+      .eq('dob', trimmedDob);
 
     if (error) {
       console.error('Supabase Error:', error);
       return NextResponse.json(
-        { message: 'Database error occurred' },
+        { message: 'Database error occurred while verifying student.' },
         { status: 500 }
       );
     }
 
-    if (!data) {
+    if (!data || data.length === 0) {
       return NextResponse.json(
-        { message: 'No student found matching this Name and Date of Birth.' },
+        { message: 'No student record found matching this Name and Date of Birth.' },
         { status: 404 }
       );
     }
 
-    return NextResponse.json({ student: data });
+    // Return the matched student (or best match)
+    return NextResponse.json({ student: data[0] });
   } catch (err) {
     console.error('Server Error:', err);
     return NextResponse.json(
