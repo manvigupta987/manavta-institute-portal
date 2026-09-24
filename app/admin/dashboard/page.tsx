@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { text } from 'stream/consumers';
+import { supabase } from '@/lib/supabase';
 
 // ============================================================================
 // DATA INTERFACES
@@ -309,15 +310,14 @@ export default function MITMAdminMasterDashboard() {
   };
 
   // TAB 1 HANDLERS
-  const handleRegisterBranch = (e: React.FormEvent) => {
+  const handleRegisterBranch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newBranch.institute_code || !newBranch.institute_name || !newBranch.mobile_no || !newBranch.password) {
       alert("Please fill all required branch registration fields!");
       return;
     }
 
-    const created: BranchInstitute = {
-      id: 'b_' + Date.now(),
+    const payload = {
       institute_code: newBranch.institute_code.trim().toUpperCase(),
       institute_name: newBranch.institute_name.trim(),
       email: newBranch.email.trim(),
@@ -328,7 +328,33 @@ export default function MITMAdminMasterDashboard() {
       head_qualification: newBranch.head_qualification.trim(),
       head_aadhar_no: newBranch.head_aadhar_no.trim(),
       head_photo_url: newBranch.head_photo_url || 'https://iili.io/3jruEzl.md.jpg',
-      created_at: new Date().toISOString().split('T')[0]
+    };
+
+    const { data, error } = await supabase
+      .from('branches')
+      .insert([payload])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Supabase branch insert error:', error);
+      alert("❌ Failed to save branch to database: " + error.message);
+      return;
+    }
+
+    const created: BranchInstitute = {
+      id: data.id,
+      institute_code: data.institute_code,
+      institute_name: data.institute_name,
+      email: data.email,
+      mobile_no: data.mobile_no,
+      password: data.password,
+      address: data.address,
+      head_name: data.head_name,
+      head_qualification: data.head_qualification,
+      head_aadhar_no: data.head_aadhar_no,
+      head_photo_url: data.head_photo_url,
+      created_at: data.created_at ? String(data.created_at).split('T')[0] : new Date().toISOString().split('T')[0]
     };
 
     setBranchesList([...branchesList, created]);
@@ -344,7 +370,7 @@ export default function MITMAdminMasterDashboard() {
       head_aadhar_no: '',
       head_photo_url: ''
     });
-    alert("✅ Branch Registered Successfully!");
+    alert("✅ Branch Registered Successfully & Saved to Database!");
   };
 
   const handleUpdateBranch = (e: React.FormEvent) => {

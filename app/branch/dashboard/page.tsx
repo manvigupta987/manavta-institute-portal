@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
 
 // =========================================================================
 // TYPES
@@ -20,8 +21,8 @@ interface BranchStudent {
   aadhar_no: string; // Mandatory & Strict Unique
   photo_url?: string;
   gender?: string;
-  enrollment_no: string; // Always "NOT_ISSUED" for branches
-  roll_no: string;       // Always "NOT_ISSUED" for branches
+  enrollment_no: string; // "NOT_ISSUED" (display only) until admin assigns real one
+  roll_no: string;       // "NOT_ISSUED" (display only) until admin assigns real one
   status: 'PENDING_APPROVAL' | 'APPROVED';
   created_at?: string;
 }
@@ -63,34 +64,67 @@ export default function BranchDashboardPage() {
     gender: 'Male'
   });
 
-  // Local Branch Records Database
-  const [studentList, setStudentList] = useState<BranchStudent[]>([
-    {
-      id: '1',
-      branch_code: 'MITM-CH01',
-      branch_name: 'MITM Chandausi Branch',
-      student_name: 'RAHUL SHARMA',
-      father_name: 'SURESH SHARMA',
-      mother_name: 'ANITA DEVI',
-      course_name: 'Computerised Professional Accounting Course',
-      admission_date: '01.08.2025',
-      dob: '12.05.2004',
-      mobile_no: '9876543210',
-      aadhar_no: '1234-5678-9012',
-      photo_url: 'https://iili.io/3jruEzl.md.jpg',
-      enrollment_no: 'NOT_ISSUED',
-      roll_no: 'NOT_ISSUED',
-      status: 'PENDING_APPROVAL',
-      created_at: '2025-08-01'
-    }
-  ]);
+  // Branch Records - now loaded from Supabase (students table), not hardcoded
+  const [studentList, setStudentList] = useState<BranchStudent[]>([]);
+  const [isLoadingList, setIsLoadingList] = useState(true);
 
   const [searchQuery, setSearchSearchQuery] = useState('');
   const [formStatus, setFormStatus] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
   const [selectedStudentForView, setSelectedStudentForView] = useState<BranchStudent | null>(null);
 
   // -------------------------------------------------------------------------
-  // 1. SINGLE STUDENT FORM SUBMISSION WITH STRICT AADHAR CHECK
+  // Map a raw Supabase students row -> BranchStudent shape used by the UI
+  // -------------------------------------------------------------------------
+  const mapRowToBranchStudent = (s: any, branchName: string): BranchStudent => ({
+    id: s.id,
+    branch_code: s.branch_code,
+    branch_name: branchName,
+    student_name: s.student_name,
+    father_name: s.father_name,
+    mother_name: s.mother_name || '',
+    course_name: s.course_name,
+    admission_date: s.admission_date,
+    dob: s.dob || '',
+    mobile_no: s.mobile_no || '',
+    aadhar_no: s.aadhar_no || '',
+    photo_url: s.photo_url || 'https://iili.io/3jruEzl.md.jpg',
+    gender: s.gender || '',
+    enrollment_no: s.enrollment_no && s.enrollment_no.startsWith('PENDING-') ? 'NOT_ISSUED' : s.enrollment_no,
+    roll_no: s.roll_no ? s.roll_no : 'NOT_ISSUED',
+    status: s.status === 'APPROVED' ? 'APPROVED' : 'PENDING_APPROVAL',
+    created_at: s.created_at
+  });
+
+  // -------------------------------------------------------------------------
+  // Load this branch's students from Supabase (so data survives login/logout)
+  // -------------------------------------------------------------------------
+  const fetchBranchStudents = async (branchCode: string, branchName: string) => {
+    setIsLoadingList(true);
+    const { data, error } = await supabase
+      .from('students')
+      .select('*')
+      .eq('branch_code', branchCode)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Fetch branch students error:', error);
+      setFormStatus({ type: 'error', msg: '❌ Could not load your submitted records: ' + error.message });
+      setIsLoadingList(false);
+      return;
+    }
+
+    setStudentList((data || []).map((row: any) => mapRowToBranchStudent(row, branchName)));
+    setIsLoadingList(false);
+  };
+
+  useEffect(() => {
+    if (branchSession?.branch_code) {
+      fetchBranchStudents(branchSession.branch_code, branchSession.branch_name);
+    }
+  }, [branchSession?.branch_code]);
+
+  // -------------------------------------------------------------------------
+  // 1. SINGLE STUDENT FORM SUBMISSION WITH STRICT AADHAR CHECK (DB-backed)
   // -------------------------------------------------------------------------
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,39 +137,69 @@ export default function BranchDashboardPage() {
       return;
     }
 
-    // AADHAR DUPLICATE CHECK
-    const isAadharDuplicate = studentList.some(
-      (s) => s.aadhar_no.replace(/\D/g, '') === cleanAadhar.replace(/\D/g, '')
+    const digitsOnly = cleanAadhar.replace(/\D/g, '');
+    const selectedCourse = formData.course_name.trim();
+
+    // DUPLICATE CHECK - same Aadhar is fine (a student can take multiple
+    // courses), but the SAME Aadhar + SAME Course combination is blocked.
+    const { data: existingMatches, error: checkError } = await supabase
+      .from('students')
+      .select('id, aadhar_no, course_name')
+      .not('aadhar_no', 'is', null);
+
+    if (checkError) {
+      setFormStatus({ type: 'error', msg: '❌ Could not verify Aadhar right now. Please try again.' });
+      return;
+    }
+
+    const isDuplicateAdmission = (existingMatches || []).some(
+      (s: any) =>
+        (s.aadhar_no || '').replace(/\D/g, '') === digitsOnly &&
+        (s.course_name || '').trim().toLowerCase() === selectedCourse.toLowerCase()
     );
 
-    if (isAadharDuplicate) {
+    if (isDuplicateAdmission) {
       setFormStatus({
         type: 'error',
-        msg: `❌ Duplicate Aadhar Error: Student with Aadhar No. [${cleanAadhar}] is ALREADY registered in the system!`
+        msg: `❌ Duplicate Admission Error: Student with Aadhar No. [${cleanAadhar}] is ALREADY registered for "${selectedCourse}"! (Same Aadhar can take admission in a different course.)`
       });
       return;
     }
 
-    const newRecord: BranchStudent = {
-      id: Date.now().toString(),
-      branch_code: branchSession?.branch_code || 'BRANCH',
-      branch_name: branchSession?.branch_name || 'Branch Office',
+    // enrollment_no is UNIQUE + NOT NULL in the DB, so every pending student
+    // gets its own unique placeholder until Main Admin assigns the real one.
+    const placeholderEnrollment = `PENDING-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+
+    const payload = {
+      enrollment_no: placeholderEnrollment,
+      roll_no: null,
       student_name: formData.student_name.trim().toUpperCase(),
       father_name: formData.father_name.trim().toUpperCase(),
-      mother_name: formData.mother_name.trim().toUpperCase(),
+      mother_name: formData.mother_name.trim().toUpperCase() || null,
       course_name: formData.course_name.trim(),
       admission_date: formData.admission_date,
-      dob: formData.dob,
-      mobile_no: formData.mobile_no.trim(),
+      dob: formData.dob || null,
+      mobile_no: formData.mobile_no.trim() || null,
       aadhar_no: cleanAadhar,
       photo_url: formData.photo_url.trim() || 'https://iili.io/3jruEzl.md.jpg',
-      gender: formData.gender,
-      enrollment_no: 'NOT_ISSUED',
-      roll_no: 'NOT_ISSUED',
       status: 'PENDING_APPROVAL',
-      created_at: new Date().toISOString()
+      branch_code: branchSession?.branch_code || 'BRANCH',
+      study_center: branchSession?.branch_name || 'MITM',
     };
 
+    const { data, error } = await supabase
+      .from('students')
+      .insert([payload])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Supabase insert error:', error);
+      setFormStatus({ type: 'error', msg: '❌ Failed to save to database: ' + error.message });
+      return;
+    }
+
+    const newRecord = mapRowToBranchStudent(data, branchSession?.branch_name || 'Branch Office');
     setStudentList([newRecord, ...studentList]);
     setFormStatus({
       type: 'success',
@@ -158,14 +222,14 @@ export default function BranchDashboardPage() {
   };
 
   // -------------------------------------------------------------------------
-  // 2. BULK CSV / EXCEL UPLOAD WITH STRICT AADHAR CHECK
+  // 2. BULK CSV / EXCEL UPLOAD WITH STRICT AADHAR CHECK (DB-backed)
   // -------------------------------------------------------------------------
   const handleCSVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (evt) => {
+    reader.onload = async (evt) => {
       try {
         const text = evt.target?.result as string;
         const lines = text.split(/\r?\n/).filter((l) => l.trim() !== '');
@@ -175,57 +239,91 @@ export default function BranchDashboardPage() {
           return;
         }
 
-        const existingAadhars = new Set(studentList.map((s) => s.aadhar_no.replace(/\D/g, '')));
-        const newRecords: BranchStudent[] = [];
+        // Pull every existing Aadhar+Course combo from the DB once, to check duplicates against
+        const { data: existingRows, error: fetchErr } = await supabase
+          .from('students')
+          .select('aadhar_no, course_name')
+          .not('aadhar_no', 'is', null);
+
+        if (fetchErr) {
+          setFormStatus({ type: 'error', msg: '❌ Could not verify existing records: ' + fetchErr.message });
+          return;
+        }
+
+        // Key = digitsOnlyAadhar + "::" + lowercased course name
+        const existingCombos = new Set(
+          (existingRows || []).map(
+            (r: any) => `${(r.aadhar_no || '').replace(/\D/g, '')}::${(r.course_name || '').trim().toLowerCase()}`
+          )
+        );
+
+        const rowsToInsert: any[] = [];
         let duplicateCount = 0;
 
         for (let i = 1; i < lines.length; i++) {
           const cols = lines[i].split(',').map((c) => c.trim().replace(/^"|"$/g, ''));
           if (cols.length >= 4) {
-            const aadhar = cols[5] || `AADHAR-${Date.now()}-${i}`;
+            const aadhar = cols[5] || '';
             const cleanA = aadhar.replace(/\D/g, '');
+            const rowCourse = cols[3] || 'Professional Course';
+            const combo = `${cleanA}::${rowCourse.trim().toLowerCase()}`;
 
-            if (cleanA && existingAadhars.has(cleanA)) {
+            if (cleanA && existingCombos.has(combo)) {
               duplicateCount++;
-              continue; // Skip duplicate Aadhar
+              continue; // Skip duplicate Aadhar+Course combination
             }
+            if (cleanA) existingCombos.add(combo);
 
-            existingAadhars.add(cleanA);
-            newRecords.push({
-              id: `${Date.now()}-${i}`,
-              branch_code: branchSession?.branch_code || 'BRANCH',
-              branch_name: branchSession?.branch_name || 'Branch Office',
+            rowsToInsert.push({
+              enrollment_no: `PENDING-${Date.now()}-${i}-${Math.floor(Math.random() * 10000)}`,
+              roll_no: null,
               student_name: (cols[0] || 'STUDENT').toUpperCase(),
               father_name: (cols[1] || '').toUpperCase(),
-              mother_name: (cols[2] || '').toUpperCase(),
+              mother_name: (cols[2] || '').toUpperCase() || null,
               course_name: cols[3] || 'Professional Course',
-              admission_date: cols[4] || '01.08.2025',
-              aadhar_no: aadhar,
-              mobile_no: cols[6] || '',
-              dob: cols[7] || '',
+              admission_date: cols[4] || new Date().toISOString().split('T')[0],
+              aadhar_no: aadhar || null,
+              mobile_no: cols[6] || null,
+              dob: cols[7] || null,
               photo_url: cols[8] || 'https://iili.io/3jruEzl.md.jpg',
-              enrollment_no: 'NOT_ISSUED',
-              roll_no: 'NOT_ISSUED',
-              status: 'PENDING_APPROVAL'
+              status: 'PENDING_APPROVAL',
+              branch_code: branchSession?.branch_code || 'BRANCH',
+              study_center: branchSession?.branch_name || 'MITM',
             });
           }
         }
 
-        if (newRecords.length > 0) {
-          setStudentList([...newRecords, ...studentList]);
+        if (rowsToInsert.length > 0) {
+          const { data: inserted, error: insertErr } = await supabase
+            .from('students')
+            .insert(rowsToInsert)
+            .select();
+
+          if (insertErr) {
+            console.error('Bulk insert error:', insertErr);
+            setFormStatus({ type: 'error', msg: '❌ Bulk upload failed: ' + insertErr.message });
+            return;
+          }
+
+          const mapped = (inserted || []).map((row: any) =>
+            mapRowToBranchStudent(row, branchSession?.branch_name || 'Branch Office')
+          );
+
+          setStudentList([...mapped, ...studentList]);
           setFormStatus({
             type: 'success',
-            msg: `✅ Successfully imported ${newRecords.length} student records! ${
-              duplicateCount > 0 ? `(Skipped ${duplicateCount} duplicate Aadhar records)` : ''
+            msg: `✅ Successfully imported ${mapped.length} student records! ${
+              duplicateCount > 0 ? `(Skipped ${duplicateCount} duplicate Aadhar+Course records)` : ''
             }`
           });
         } else if (duplicateCount > 0) {
           setFormStatus({
             type: 'error',
-            msg: `❌ All ${duplicateCount} records in the CSV were skipped due to Duplicate Aadhar Numbers!`
+            msg: `❌ All ${duplicateCount} records in the CSV were skipped — same Aadhar is already admitted in the same course!`
           });
         }
       } catch (err) {
+        console.error(err);
         setFormStatus({ type: 'error', msg: 'Failed to parse CSV file. Please check format.' });
       }
     };
@@ -552,7 +650,9 @@ export default function BranchDashboardPage() {
             </div>
           </div>
 
-          {/* Table */}
+          {isLoadingList ? (
+            <div className="p-8 text-center text-slate-500 text-xs font-bold">⏳ Loading your submitted records...</div>
+          ) : (
           <div className="overflow-x-auto border border-slate-200 rounded-xl shadow-sm">
             <table className="w-full text-left text-xs text-slate-800">
               <thead className="bg-slate-900 text-white font-semibold">
@@ -623,6 +723,7 @@ export default function BranchDashboardPage() {
               </tbody>
             </table>
           </div>
+          )}
         </div>
 
       </div>
