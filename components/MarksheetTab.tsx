@@ -1,6 +1,9 @@
 "use client";
 
-import React, { useState } from 'react';
+// Save as: components/MarksheetTab.tsx
+import React, { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
+import { printMarksheet, formatDate, buildQrUrl } from '@/lib/print-templates';
 
 export interface SubjectMarks {
   paper_code: string;
@@ -22,7 +25,7 @@ export interface MarksheetRecord {
   study_center: string;
   session: string;
   serial_no: string;
-  photo_url: string;
+  photo_url?: string; // loaded on demand (heavy) - not part of the list query
   course_name: string;
   subjects: SubjectMarks[];
   grand_total_obtained: number;
@@ -32,134 +35,171 @@ export interface MarksheetRecord {
   issue_date: string;
 }
 
-interface StudentRecord {
-  id: string;
-  enrollment_no: string;
-  roll_no: string;
-  student_name: string;
-  father_name: string;
+interface StudentLike {
+  roll_no?: string;
+  enrollment_no?: string;
+  student_name?: string;
+  father_name?: string;
   mother_name?: string;
-  course_name: string;
+  course_name?: string;
   dob?: string;
-  mobile_no?: string;
-  aadhar_no?: string;
   photo_url?: string;
   study_center?: string;
+  session?: string;
+  serial_no?: string;
 }
 
 interface MarksheetTabProps {
-  studentsList?: StudentRecord[];
+  studentsList?: StudentLike[];
   isLetterhead?: boolean;
   setIsLetterhead?: (val: boolean) => void;
 }
 
-export default function MarksheetTabComponent({
-  studentsList = [],
-}: MarksheetTabProps) {
-  // Marksheets Database State
-  const [marksheetsList, setMarksheetsList] = useState<MarksheetRecord[]>([
-    {
-      id: 'm1',
-      roll_no: '103766',
-      enrollment_no: '1039954663',
-      student_name: 'SHREYA CHUG',
-      father_name: 'YOGESH CHUG',
-      mother_name: 'SUNITA CHUG',
-      dob: '15.08.2005',
-      study_center: 'MITM BILARI',
-      session: '2025-2027',
-      serial_no: 'DN-3754',
-      photo_url: 'https://iili.io/CNGWoTG.md.jpg',
-      course_name: 'Computerised Professional Accounting Course',
-      subjects: [
-        { paper_code: 'CPAC 201', paper_name: 'IT TOOLS & BUSINESS SYSTEMS', max_marks: 150, theory: 70, practical: 45, total_marks: 115 },
-        { paper_code: 'CPAC 202', paper_name: 'FINANCIAL ACCOUNTING & TALLY PRIME', max_marks: 150, theory: 75, practical: 48, total_marks: 123 },
-        { paper_code: 'CPAC 203', paper_name: 'GST & DIRECT TAXATION SYSTEMS', max_marks: 150, theory: 80, practical: 46, total_marks: 126 },
-        { paper_code: 'CPAC 204', paper_name: 'PROJECT WORK & VIVA VOCE', max_marks: 150, theory: 82, practical: 48, total_marks: 130 },
-      ],
-      grand_total_obtained: 494,
-      grand_total_max: 600,
-      percentage: 82.33,
-      grade: 'A',
-      issue_date: '02.04.2026',
-    },
-  ]);
+const PLACEHOLDER_PHOTO = 'https://iili.io/3jruEzl.md.jpg';
 
-  // Form State
+// Everything EXCEPT photo_url -> list loads very fast
+const LIST_COLS =
+  'id,roll_no,enrollment_no,student_name,father_name,mother_name,dob,study_center,session,serial_no,course_name,subjects,grand_total_obtained,grand_total_max,percentage,grade,issue_date,created_at';
+
+const DEFAULT_SUBJECTS: SubjectMarks[] = [
+  { paper_code: 'CPAC 201', paper_name: 'IT TOOLS', max_marks: 150, theory: 0, practical: 0, total_marks: 0 },
+  { paper_code: 'CPAC 202', paper_name: 'FINANCIAL ACCOUNTING', max_marks: 150, theory: 0, practical: 0, total_marks: 0 },
+];
+
+const emptyForm = () => ({
+  roll_no: '',
+  enrollment_no: '',
+  course_name: '',
+  student_name: '',
+  father_name: '',
+  mother_name: '',
+  dob: '',
+  session: '2025-2027',
+  study_center: 'MITM BILARI',
+  serial_no: '',
+  photo_url: '',
+  issue_date: new Date().toISOString().split('T')[0],
+});
+
+const mapRow = (r: any): MarksheetRecord => ({
+  id: r.id,
+  roll_no: r.roll_no,
+  enrollment_no: r.enrollment_no || '',
+  student_name: r.student_name,
+  father_name: r.father_name || '',
+  mother_name: r.mother_name || '',
+  dob: r.dob || '',
+  study_center: r.study_center || '',
+  session: r.session || '',
+  serial_no: r.serial_no || '',
+  photo_url: r.photo_url || undefined,
+  course_name: r.course_name,
+  subjects: Array.isArray(r.subjects) ? r.subjects : [],
+  grand_total_obtained: Number(r.grand_total_obtained) || 0,
+  grand_total_max: Number(r.grand_total_max) || 0,
+  percentage: Number(r.percentage) || 0,
+  grade: r.grade || '',
+  issue_date: r.issue_date || '',
+});
+
+const calculateGrade = (pct: number) => {
+  if (pct >= 90) return 'Ex';
+  if (pct >= 80) return 'A';
+  if (pct >= 70) return 'B';
+  if (pct >= 60) return 'C';
+  if (pct >= 40) return 'D';
+  return 'F';
+};
+
+export default function MarksheetTabComponent({ studentsList = [] }: MarksheetTabProps) {
+  const [marksheetsList, setMarksheetsList] = useState<MarksheetRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({
-    roll_no: '',
-    enrollment_no: '',
-    course_name: '',
-    student_name: '',
-    father_name: '',
-    mother_name: '',
-    dob: '',
-    session: '2025-2027',
-    study_center: 'MITM BILARI',
-    serial_no: '',
-    photo_url: '',
-    issue_date: new Date().toISOString().split('T')[0],
-  });
+  const [formData, setFormData] = useState(emptyForm());
+  const [subjects, setSubjects] = useState<SubjectMarks[]>(DEFAULT_SUBJECTS);
 
-  // Dynamic Subjects State
-  const [subjects, setSubjects] = useState<SubjectMarks[]>([
-    { paper_code: 'CPAC 201', paper_name: 'IT TOOLS', max_marks: 150, theory: 70, practical: 45, total_marks: 115 },
-    { paper_code: 'CPAC 202', paper_name: 'FINANCIAL ACCOUNTING', max_marks: 150, theory: 68, practical: 48, total_marks: 116 },
-  ]);
-
-  // View Modal State
   const [viewingMarksheet, setViewingMarksheet] = useState<MarksheetRecord | null>(null);
 
-  // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'roll' | 'percentage'>('roll');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
-  // Roll Number Change & Auto-fill
+  // ---------------------------------------------------------------------
+  // LOAD from Supabase
+  // ---------------------------------------------------------------------
+  const fetchMarksheets = async () => {
+    setIsLoading(true);
+    const { data, error } = await supabase
+      .from('marksheets')
+      .select(LIST_COLS)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Fetch marksheets error:', error);
+      alert('❌ Failed to load marksheets: ' + error.message);
+    } else {
+      setMarksheetsList((data || []).map(mapRow));
+    }
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    fetchMarksheets();
+  }, []);
+
+  // Photo is heavy (base64) -> fetched only when needed (view / print / edit)
+  const fetchPhoto = async (id: string): Promise<string> => {
+    const { data } = await supabase.from('marksheets').select('photo_url').eq('id', id).single();
+    return data?.photo_url || '';
+  };
+
+  const withPhoto = async (m: MarksheetRecord): Promise<MarksheetRecord> => {
+    if (m.photo_url) return m;
+    const photo = await fetchPhoto(m.id);
+    return { ...m, photo_url: photo || PLACEHOLDER_PHOTO };
+  };
+
+  // ---------------------------------------------------------------------
+  // Form helpers
+  // ---------------------------------------------------------------------
   const handleRollNoChange = (rollVal: string) => {
     setFormData((prev) => ({ ...prev, roll_no: rollVal }));
     if (!rollVal.trim()) return;
 
-    // Check existing marksheets first
+    // Marksheet already exists for this roll -> open it for editing
     const existing = marksheetsList.find((m) => m.roll_no.trim() === rollVal.trim());
     if (existing && !editingId) {
       handleStartEdit(existing);
       return;
     }
 
-    // Otherwise check students list
-    const matched = studentsList.find((s) => s.roll_no.trim() === rollVal.trim());
+    // Otherwise auto-fill from students list
+    const matched = studentsList.find((s) => (s.roll_no || '').trim() === rollVal.trim());
     if (matched) {
       setFormData((prev) => ({
         ...prev,
-        roll_no: matched.roll_no,
+        roll_no: matched.roll_no || prev.roll_no,
         enrollment_no: matched.enrollment_no || prev.enrollment_no,
         course_name: matched.course_name || prev.course_name,
         student_name: matched.student_name || prev.student_name,
         father_name: matched.father_name || prev.father_name,
         mother_name: matched.mother_name || prev.mother_name,
         dob: matched.dob || prev.dob,
+        session: matched.session || prev.session,
         study_center: matched.study_center || prev.study_center,
         photo_url: matched.photo_url || prev.photo_url,
-        serial_no: prev.serial_no || `DN-${Math.floor(1000 + Math.random() * 9000)}`,
+        serial_no: matched.serial_no || prev.serial_no,
       }));
     }
   };
 
-  // Add / Remove Dynamic Subject Rows
   const handleAddSubjectRow = () => {
     const nextNum = subjects.length + 1;
     setSubjects([
       ...subjects,
-      {
-        paper_code: `SUB 10${nextNum}`,
-        paper_name: `PAPER ${nextNum}`,
-        max_marks: 150,
-        theory: 0,
-        practical: 0,
-        total_marks: 0,
-      },
+      { paper_code: `SUB 10${nextNum}`, paper_name: `PAPER ${nextNum}`, max_marks: 150, theory: 0, practical: 0, total_marks: 0 },
     ]);
   };
 
@@ -174,35 +214,21 @@ export default function MarksheetTabComponent({
   const handleSubjectChange = (index: number, field: keyof SubjectMarks, value: any) => {
     const updated = [...subjects];
     const item = { ...updated[index], [field]: value };
-
     if (field === 'theory' || field === 'practical') {
       const th = field === 'theory' ? Number(value) || 0 : Number(item.theory) || 0;
       const pr = field === 'practical' ? Number(value) || 0 : Number(item.practical) || 0;
       item.total_marks = th + pr;
     }
-
     updated[index] = item;
     setSubjects(updated);
   };
 
-  // Calculations
   const grandObtained = subjects.reduce((sum, s) => sum + (Number(s.theory) || 0) + (Number(s.practical) || 0), 0);
   const grandMax = subjects.reduce((sum, s) => sum + (Number(s.max_marks) || 0), 0);
   const percentage = grandMax > 0 ? Number(((grandObtained / grandMax) * 100).toFixed(2)) : 0;
-
-  const calculateGrade = (pct: number) => {
-    if (pct >= 90) return 'Ex';
-    if (pct >= 80) return 'A';
-    if (pct >= 70) return 'B';
-    if (pct >= 60) return 'C';
-    if (pct >= 40) return 'D';
-    return 'F';
-  };
-
   const currentGrade = calculateGrade(percentage);
 
-  // Edit Trigger
-  const handleStartEdit = (m: MarksheetRecord) => {
+  const handleStartEdit = async (m: MarksheetRecord) => {
     setEditingId(m.id);
     setFormData({
       roll_no: m.roll_no,
@@ -215,37 +241,28 @@ export default function MarksheetTabComponent({
       session: m.session,
       study_center: m.study_center,
       serial_no: m.serial_no,
-      photo_url: m.photo_url,
+      photo_url: m.photo_url || '',
       issue_date: m.issue_date,
     });
-    setSubjects(m.subjects && m.subjects.length > 0 ? m.subjects : []);
+    setSubjects(m.subjects && m.subjects.length > 0 ? m.subjects : DEFAULT_SUBJECTS);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    if (!m.photo_url) {
+      const photo = await fetchPhoto(m.id);
+      setFormData((prev) => ({ ...prev, photo_url: photo }));
+    }
   };
 
   const handleCancelEdit = () => {
     setEditingId(null);
-    setFormData({
-      roll_no: '',
-      enrollment_no: '',
-      course_name: '',
-      student_name: '',
-      father_name: '',
-      mother_name: '',
-      dob: '',
-      session: '2025-2027',
-      study_center: 'MITM BILARI',
-      serial_no: '',
-      photo_url: '',
-      issue_date: new Date().toISOString().split('T')[0],
-    });
-    setSubjects([
-      { paper_code: 'CPAC 201', paper_name: 'IT TOOLS', max_marks: 150, theory: 70, practical: 45, total_marks: 115 },
-      { paper_code: 'CPAC 202', paper_name: 'FINANCIAL ACCOUNTING', max_marks: 150, theory: 68, practical: 48, total_marks: 116 },
-    ]);
+    setFormData(emptyForm());
+    setSubjects(DEFAULT_SUBJECTS);
   };
 
-  // Submit Handler
-  const handleSaveMarksheet = (e: React.FormEvent) => {
+  // ---------------------------------------------------------------------
+  // SAVE to Supabase (insert / update)
+  // ---------------------------------------------------------------------
+  const handleSaveMarksheet = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.roll_no || !formData.student_name || !formData.course_name) {
@@ -253,8 +270,9 @@ export default function MarksheetTabComponent({
       return;
     }
 
-    const newRecord: MarksheetRecord = {
-      id: editingId || `m_${Date.now()}`,
+    setIsSaving(true);
+
+    const payload: any = {
       roll_no: formData.roll_no.trim(),
       enrollment_no: formData.enrollment_no.trim() || `ENR-${Date.now().toString().slice(-6)}`,
       student_name: formData.student_name.trim().toUpperCase(),
@@ -264,7 +282,6 @@ export default function MarksheetTabComponent({
       study_center: formData.study_center.trim(),
       session: formData.session.trim(),
       serial_no: formData.serial_no.trim() || `DN-${Math.floor(1000 + Math.random() * 9000)}`,
-      photo_url: formData.photo_url.trim() || 'https://iili.io/CNGWoTG.md.jpg',
       course_name: formData.course_name.trim(),
       subjects: subjects.map((s) => ({
         ...s,
@@ -277,138 +294,82 @@ export default function MarksheetTabComponent({
       issue_date: formData.issue_date,
     };
 
+    // Don't overwrite an existing photo with an empty value
+    const photo = formData.photo_url.trim();
+    if (photo) payload.photo_url = photo;
+    else if (!editingId) payload.photo_url = PLACEHOLDER_PHOTO;
+
     if (editingId) {
-      setMarksheetsList(marksheetsList.map((item) => (item.id === editingId ? newRecord : item)));
+      const { data, error } = await supabase
+        .from('marksheets')
+        .update(payload)
+        .eq('id', editingId)
+        .select(LIST_COLS)
+        .single();
+
+      if (error) {
+        console.error('Update marksheet error:', error);
+        alert('❌ Failed to update marksheet: ' + error.message);
+        setIsSaving(false);
+        return;
+      }
+      setMarksheetsList(marksheetsList.map((item) => (item.id === editingId ? mapRow(data) : item)));
       alert('✅ Marksheet Record Updated Successfully!');
     } else {
-      setMarksheetsList([newRecord, ...marksheetsList]);
+      const { data, error } = await supabase
+        .from('marksheets')
+        .insert([payload])
+        .select(LIST_COLS)
+        .single();
+
+      if (error) {
+        console.error('Insert marksheet error:', error);
+        alert('❌ Failed to save marksheet: ' + error.message);
+        setIsSaving(false);
+        return;
+      }
+      setMarksheetsList([mapRow(data), ...marksheetsList]);
       alert('🎉 Marksheet Generated & Saved Successfully!');
     }
 
+    setIsSaving(false);
     handleCancelEdit();
   };
 
-  // Dedicated Print Function
-  const handlePrintMarksheetDedicated = (m: MarksheetRecord) => {
-    const printWin = window.open('', '_blank');
-    if (!printWin) return;
+  // ---------------------------------------------------------------------
+  // View / Print / Delete
+  // ---------------------------------------------------------------------
+  const handlePrint = async (m: MarksheetRecord) => {
+    const win = window.open('', '_blank'); // open right away (keeps popup permission)
+    const full = await withPhoto(m);
+    printMarksheet(full, {}, win);
+  };
 
-    const qrText = `Verified
-Name: ${m.student_name}
-Roll No: ${m.roll_no}
-Course: ${m.course_name}
-DOB: ${m.dob || 'N/A'}
-Date of Issue: ${m.issue_date}`;
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(qrText)}`;
+  const handleView = async (m: MarksheetRecord) => {
+    setViewingMarksheet(await withPhoto(m));
+  };
 
-    printWin.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Marksheet - ${m.student_name}</title>
-          <style>
-            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background: #fff; color: #000; }
-            .a4-page { width: 210mm; min-height: 297mm; margin: 0 auto; padding: 48mm 15mm 15mm 15mm; box-sizing: border-box; position: relative; }
-            .doc-title { font-size: 16px; font-weight: 900; text-align: center; margin-bottom: 15px; text-decoration: underline; text-transform: uppercase; letter-spacing: 1px; }
-            .student-info-section { display: flex; justify-content: space-between; gap: 15px; margin-bottom: 20px; border: 1.5px solid #000; padding: 12px; border-radius: 6px; }
-            .info-grid { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 15px; font-size: 11px; }
-            .info-item { display: flex; }
-            .info-lbl { font-weight: 800; width: 110px; flex-shrink: 0; text-transform: uppercase; color: #000; }
-            .info-val { font-weight: 700; text-transform: uppercase; color: #0f172a; }
-            .photo-box-container { text-align: center; flex-shrink: 0; }
-            .doc-no-tag { font-size: 10px; font-weight: 800; margin-bottom: 4px; color: #000; }
-            .photo-frame { width: 95px; height: 115px; border: 1.5px solid #000; object-fit: cover; border-radius: 4px; background: #f8fafc; }
-            table.marks-tbl { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px; }
-            table.marks-tbl th, table.marks-tbl td { border: 1px solid #000; padding: 8px; text-align: center; }
-            table.marks-tbl th { background-color: #f1f5f9; font-weight: 800; text-transform: uppercase; }
-            .summary-box { display: flex; justify-content: space-between; align-items: center; border: 2px solid #000; padding: 10px 15px; font-weight: 800; font-size: 12px; margin-bottom: 25px; background: #fafafa; }
-            .footer-signatures { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 40px; }
-            .sign-block { text-align: center; width: 150px; }
-            .sign-img { height: 35px; object-fit: contain; margin-bottom: 4px; }
-            .sign-title { font-size: 9px; font-weight: 800; text-transform: uppercase; border-top: 1px solid #000; padding-top: 3px; }
-            .legend-box { border-top: 1px solid #666; padding-top: 6px; margin-top: 30px; font-size: 8px; color: #444; text-align: center; line-height: 1.4; }
-            @page { size: A4; margin: 0; }
-            @media print { body { padding: 0; } }
-          </style>
-        </head>
-        <body>
-          <div class="a4-page">
-            <div class="doc-title">STATEMENT OF MARKS</div>
-            <div class="student-info-section">
-              <div class="info-grid">
-                <div class="info-item"><span class="info-lbl">PROGRAMME:</span><span class="info-val">${m.course_name}</span></div>
-                <div class="info-item"><span class="info-lbl">SESSION:</span><span class="info-val">${m.session}</span></div>
-                <div class="info-item"><span class="info-lbl">ROLL NO:</span><span class="info-val" style="color:#0284c7;">${m.roll_no}</span></div>
-                <div class="info-item"><span class="info-lbl">ENROLLMENT NO:</span><span class="info-val" style="color:#0369a1;">${m.enrollment_no}</span></div>
-                <div class="info-item"><span class="info-lbl">CANDIDATE NAME:</span><span class="info-val">${m.student_name}</span></div>
-                <div class="info-item"><span class="info-lbl">FATHER'S NAME:</span><span class="info-val">${m.father_name}</span></div>
-                <div class="info-item"><span class="info-lbl">MOTHER'S NAME:</span><span class="info-val">${m.mother_name || 'N/A'}</span></div>
-                <div class="info-item"><span class="info-lbl">DATE OF BIRTH:</span><span class="info-val">${m.dob || 'N/A'}</span></div>
-                <div class="info-item" style="grid-column: span 2;"><span class="info-lbl">STUDY CENTER:</span><span class="info-val">${m.study_center}</span></div>
-              </div>
-              <div class="photo-box-container">
-                <div class="doc-no-tag">DOC NO: ${m.serial_no}</div>
-                <img src="${m.photo_url || 'https://iili.io/CNGWoTG.md.jpg'}" class="photo-frame" alt="Student Photo" />
-              </div>
-            </div>
-            <table class="marks-tbl">
-              <thead>
-                <tr>
-                  <th style="width: 15%;">PAPER CODE</th>
-                  <th style="width: 40%; text-align: left; padding-left: 10px;">EXAM / PAPER NAME</th>
-                  <th style="width: 12%;">MAX MARKS</th>
-                  <th style="width: 11%;">THEORY (100)</th>
-                  <th style="width: 11%;">PRACTICAL (50)</th>
-                  <th style="width: 11%;">TOTAL</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${m.subjects
-                  .map(
-                    (s) => `
-                  <tr>
-                    <td style="font-weight: 700; font-family: monospace;">${s.paper_code}</td>
-                    <td style="text-align: left; padding-left: 10px; font-weight: 600;">${s.paper_name}</td>
-                    <td>${s.max_marks}</td>
-                    <td>${s.theory}</td>
-                    <td>${s.practical}</td>
-                    <td style="font-weight: 800;">${s.total_marks}</td>
-                  </tr>
-                `
-                  )
-                  .join('')}
-              </tbody>
-            </table>
-            <div class="summary-box">
-              <div>GRAND TOTAL: <span style="color:#0284c7; margin-left: 5px;">${m.grand_total_obtained} / ${m.grand_total_max}</span></div>
-              <div>PERCENTAGE: <span style="color:#0f172a; margin-left: 5px;">${m.percentage}%</span></div>
-              <div>FINAL GRADE: <span style="color:#15803d; margin-left: 5px;">${m.grade}</span></div>
-            </div>
-            <div class="footer-signatures">
-              <div class="sign-block">
-                <img src="/authorised-signature.png" class="sign-img" onError="this.style.display='none'" />
-                <div class="sign-title">DIRECTOR (MITM)</div>
-              </div>
-              <div style="text-align: center;">
-                <img src="${qrUrl}" style="width: 70px; height: 70px;" alt="QR Code" />
-                <div style="font-size: 8px; font-weight: 800; margin-top: 4px;">SCAN TO VERIFY</div>
-              </div>
-              <div class="sign-block">
-                <div style="font-size: 10px; font-weight: 800; margin-bottom: 25px;">DATE: ${m.issue_date}</div>
-                <div class="sign-title">CHIEF EXAM CONTROLLER</div>
-              </div>
-            </div>
-            <div class="legend-box">
-              <strong>GRADING SCALE LEGEND:</strong> Ex: 90% & Above | A: 80% - 89% | B: 70% - 79% | C: 60% - 69% | D: 40% - 59% | F: Below 40% (Fail)
-            </div>
-          </div>
-          <script>
-            window.onload = function() { window.print(); window.close(); };
-          </script>
-        </body>
-      </html>
-    `);
-    printWin.document.close();
+  const handleDeleteOne = async (id: string) => {
+    if (!confirm('Delete this marksheet record?')) return;
+    const { error } = await supabase.from('marksheets').delete().eq('id', id);
+    if (error) {
+      alert('❌ Failed to delete: ' + error.message);
+      return;
+    }
+    setMarksheetsList(marksheetsList.filter((rec) => rec.id !== id));
+    setSelectedIds(selectedIds.filter((i) => i !== id));
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedIds.length === 0) return;
+    if (!confirm(`Delete ${selectedIds.length} selected marksheets?`)) return;
+    const { error } = await supabase.from('marksheets').delete().in('id', selectedIds);
+    if (error) {
+      alert('❌ Failed to delete: ' + error.message);
+      return;
+    }
+    setMarksheetsList(marksheetsList.filter((m) => !selectedIds.includes(m.id)));
+    setSelectedIds([]);
   };
 
   const filteredList = marksheetsList
@@ -428,13 +389,7 @@ Date of Issue: ${m.issue_date}`;
       return a.roll_no.localeCompare(b.roll_no);
     });
 
-  const handleDeleteSelected = () => {
-    if (selectedIds.length === 0) return;
-    if (confirm(`Delete ${selectedIds.length} selected marksheets?`)) {
-      setMarksheetsList(marksheetsList.filter((m) => !selectedIds.includes(m.id)));
-      setSelectedIds([]);
-    }
-  };
+  const photoIsData = formData.photo_url.startsWith('data:');
 
   return (
     <div className="space-y-8">
@@ -462,7 +417,7 @@ Date of Issue: ${m.issue_date}`;
         </div>
 
         <form onSubmit={handleSaveMarksheet} className="space-y-6">
-          {/* SECTION 1: CANDIDATE INPUT FIELDS */}
+          {/* CANDIDATE DETAILS */}
           <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 space-y-4">
             <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide border-b border-slate-200 pb-2">
               👤 Candidate & Academic Details
@@ -546,7 +501,7 @@ Date of Issue: ${m.issue_date}`;
                   type="text"
                   value={formData.dob}
                   onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
-                  placeholder="e.g. 15.08.2005"
+                  placeholder="e.g. 2005-08-15"
                   className="w-full px-3 py-2 border text-black border-slate-300 rounded-lg font-semibold bg-white"
                 />
               </div>
@@ -585,14 +540,29 @@ Date of Issue: ${m.issue_date}`;
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 uppercase mb-1">Candidate Photo URL</label>
-                <input
-                  type="text"
-                  value={formData.photo_url}
-                  onChange={(e) => setFormData({ ...formData, photo_url: e.target.value })}
-                  placeholder="https://..."
-                  className="w-full px-3 py-2 border text-black border-slate-300 rounded-lg text-xs bg-white"
-                />
+                <label className="block font-bold text-slate-700 uppercase mb-1">Candidate Photo</label>
+                {photoIsData ? (
+                  <div className="flex items-center gap-2 px-2 py-1 border border-slate-300 rounded-lg bg-white">
+                    <img src={formData.photo_url} alt="" className="w-8 h-9 object-cover rounded border" />
+                    <span className="text-[11px] font-bold text-black flex-1">✅ Auto-filled from student record</span>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, photo_url: '' })}
+                      className="text-rose-600 font-bold text-xs"
+                      title="Remove photo"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    value={formData.photo_url}
+                    onChange={(e) => setFormData({ ...formData, photo_url: e.target.value })}
+                    placeholder="https://... (auto-fills from Roll No)"
+                    className="w-full px-3 py-2 border text-black border-slate-300 rounded-lg text-xs bg-white"
+                  />
+                )}
               </div>
 
               <div>
@@ -607,7 +577,7 @@ Date of Issue: ${m.issue_date}`;
             </div>
           </div>
 
-          {/* SECTION 2: SUBJECTS MARKS ENTRY */}
+          {/* SUBJECTS */}
           <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-200 pb-2">
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">
@@ -707,7 +677,6 @@ Date of Issue: ${m.issue_date}`;
               </table>
             </div>
 
-            {/* SECTION 3: SUMMARY */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-900 text-white p-4 rounded-xl border border-slate-800 text-xs font-bold">
               <div className="flex items-center justify-between">
                 <span className="text-slate-400 uppercase">Grand Total:</span>
@@ -738,9 +707,10 @@ Date of Issue: ${m.issue_date}`;
             )}
             <button
               type="submit"
-              className="px-6 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs rounded-xl shadow-lg transition cursor-pointer flex items-center gap-2"
+              disabled={isSaving}
+              className="px-6 py-2.5 bg-sky-600 hover:bg-sky-700 disabled:bg-slate-400 text-white font-bold text-xs rounded-xl shadow-lg transition cursor-pointer flex items-center gap-2"
             >
-              💾 {editingId ? 'Update Marksheet Record' : 'Save & Generate Marksheet'}
+              💾 {isSaving ? 'Saving...' : editingId ? 'Update Marksheet Record' : 'Save & Generate Marksheet'}
             </button>
           </div>
         </form>
@@ -753,9 +723,7 @@ Date of Issue: ${m.issue_date}`;
             <h3 className="font-bold text-sm text-slate-900 uppercase">
               📊 Generated Student Marksheets Directory ({marksheetsList.length})
             </h3>
-            <p className="text-xs text-slate-500 mt-0.5">
-              View or print official statement of marks.
-            </p>
+            <p className="text-xs text-slate-500 mt-0.5">View or print official statement of marks.</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
@@ -788,102 +756,105 @@ Date of Issue: ${m.issue_date}`;
           </div>
         </div>
 
-        <div className="overflow-x-auto border border-slate-200 rounded-xl shadow-sm">
-          <table className="w-full text-left text-xs text-slate-800">
-            <thead className="bg-slate-900 text-white font-semibold">
-              <tr>
-                <th className="p-3 text-center">
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.length > 0 && selectedIds.length === filteredList.length}
-                    onChange={(e) =>
-                      setSelectedIds(e.target.checked ? filteredList.map((m) => m.id) : [])
-                    }
-                    className="rounded text-sky-600"
-                  />
-                </th>
-                <th className="p-3">Roll No</th>
-                <th className="p-3">Enrollment No</th>
-                <th className="p-3">Candidate Name</th>
-                <th className="p-3">Course Name</th>
-                <th className="p-3 text-center">Grand Total</th>
-                <th className="p-3 text-center">Percentage</th>
-                <th className="p-3 text-center">Grade</th>
-                <th className="p-3 text-center">Action Options</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
-              {filteredList.map((m) => (
-                <tr key={m.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="p-3 text-center">
+        {isLoading ? (
+          <div className="p-8 text-center text-slate-500 text-xs font-bold">⏳ Loading marksheets...</div>
+        ) : (
+          <div className="overflow-x-auto border border-slate-200 rounded-xl shadow-sm">
+            <table className="w-full text-left text-xs text-slate-800">
+              <thead className="bg-slate-900 text-white font-semibold">
+                <tr>
+                  <th className="p-3 text-center">
                     <input
                       type="checkbox"
-                      checked={selectedIds.includes(m.id)}
-                      onChange={(e) =>
-                        setSelectedIds(
-                          e.target.checked ? [...selectedIds, m.id] : selectedIds.filter((id) => id !== m.id)
-                        )
-                      }
+                      checked={selectedIds.length > 0 && selectedIds.length === filteredList.length}
+                      onChange={(e) => setSelectedIds(e.target.checked ? filteredList.map((m) => m.id) : [])}
                       className="rounded text-sky-600"
                     />
-                  </td>
-                  <td className="p-3 font-mono font-bold text-slate-900">{m.roll_no}</td>
-                  <td className="p-3 font-mono font-bold text-sky-800">{m.enrollment_no}</td>
-                  <td className="p-3 font-bold uppercase">{m.student_name}</td>
-                  <td className="p-3 font-medium">{m.course_name}</td>
-                  <td className="p-3 text-center font-bold">
-                    {m.grand_total_obtained} / {m.grand_total_max}
-                  </td>
-                  <td className="p-3 text-center font-bold text-sky-700">{m.percentage}%</td>
-                  <td className="p-3 text-center font-bold text-emerald-700">{m.grade}</td>
-                  <td className="p-3 text-center space-x-1.5 whitespace-nowrap">
-                    <button
-                      onClick={() => handleStartEdit(m)}
-                      className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded text-[11px] shadow transition cursor-pointer"
-                    >
-                      ✏️ Edit
-                    </button>
-                    <button
-                      onClick={() => setViewingMarksheet(m)}
-                      className="px-2.5 py-1 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded text-[11px] shadow transition cursor-pointer"
-                    >
-                      👁️ View
-                    </button>
-                    <button
-                      onClick={() => handlePrintMarksheetDedicated(m)}
-                      className="px-2.5 py-1 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded text-[11px] shadow transition cursor-pointer"
-                    >
-                      🖨️ Print
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (confirm('Delete this marksheet record?')) {
-                          setMarksheetsList(marksheetsList.filter((rec) => rec.id !== m.id));
-                        }
-                      }}
-                      className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded text-[11px] shadow transition cursor-pointer"
-                    >
-                      🗑️ Delete
-                    </button>
-                  </td>
+                  </th>
+                  <th className="p-3">Roll No</th>
+                  <th className="p-3">Enrollment No</th>
+                  <th className="p-3">Candidate Name</th>
+                  <th className="p-3">Course Name</th>
+                  <th className="p-3 text-center">Grand Total</th>
+                  <th className="p-3 text-center">Percentage</th>
+                  <th className="p-3 text-center">Grade</th>
+                  <th className="p-3 text-center">Action Options</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {filteredList.length === 0 && (
+                  <tr>
+                    <td colSpan={9} className="p-8 text-center text-slate-500 font-medium">
+                      No marksheets found.
+                    </td>
+                  </tr>
+                )}
+                {filteredList.map((m) => (
+                  <tr key={m.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="p-3 text-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(m.id)}
+                        onChange={(e) =>
+                          setSelectedIds(e.target.checked ? [...selectedIds, m.id] : selectedIds.filter((id) => id !== m.id))
+                        }
+                        className="rounded text-sky-600"
+                      />
+                    </td>
+                    <td className="p-3 font-mono font-bold text-slate-900">{m.roll_no}</td>
+                    <td className="p-3 font-mono font-bold text-sky-800">{m.enrollment_no}</td>
+                    <td className="p-3 font-bold uppercase">{m.student_name}</td>
+                    <td className="p-3 font-medium">{m.course_name}</td>
+                    <td className="p-3 text-center font-bold">
+                      {m.grand_total_obtained} / {m.grand_total_max}
+                    </td>
+                    <td className="p-3 text-center font-bold text-sky-700">{m.percentage}%</td>
+                    <td className="p-3 text-center font-bold text-emerald-700">{m.grade}</td>
+                    <td className="p-3 text-center space-x-1.5 whitespace-nowrap">
+                      <button
+                        onClick={() => handleStartEdit(m)}
+                        className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded text-[11px] shadow transition cursor-pointer"
+                      >
+                        ✏️ Edit
+                      </button>
+                      <button
+                        onClick={() => handleView(m)}
+                        className="px-2.5 py-1 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded text-[11px] shadow transition cursor-pointer"
+                      >
+                        👁️ View
+                      </button>
+                      <button
+                        onClick={() => handlePrint(m)}
+                        className="px-2.5 py-1 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded text-[11px] shadow transition cursor-pointer"
+                      >
+                        🖨️ Print
+                      </button>
+                      <button
+                        onClick={() => handleDeleteOne(m.id)}
+                        className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded text-[11px] shadow transition cursor-pointer"
+                      >
+                        🗑️ Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
-      {/* 👁️ VIEW MARKSHEET MODAL (NON-ZOOMING PREVIEW) */}
+      {/* VIEW MARKSHEET MODAL (black text, same as print) */}
       {viewingMarksheet && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-3xl w-full p-6 sm:p-8 my-8 shadow-2xl space-y-6 relative max-h-[90vh] overflow-y-auto text-slate-900">
+          <div className="bg-white rounded-2xl max-w-3xl w-full p-6 sm:p-8 my-8 shadow-2xl space-y-6 relative max-h-[90vh] overflow-y-auto text-black">
             <div className="flex items-center justify-between border-b pb-3">
-              <h3 className="text-sm font-bold uppercase text-slate-800 flex items-center gap-2">
+              <h3 className="text-sm font-bold uppercase flex items-center gap-2">
                 <span>👁️</span> Marksheet Preview - {viewingMarksheet.student_name}
               </h3>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => handlePrintMarksheetDedicated(viewingMarksheet)}
+                  onClick={() => printMarksheet(viewingMarksheet)}
                   className="px-4 py-1.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold rounded-lg shadow transition"
                 >
                   🖨️ Print Now
@@ -897,94 +868,77 @@ Date of Issue: ${m.issue_date}`;
               </div>
             </div>
 
-            {/* PREVIEW CONTAINER WITH TOP MARGIN FOR LETTERHEAD */}
             <div className="pt-12 space-y-6 text-xs font-sans">
-              <div className="text-center font-black text-base text-slate-900 underline uppercase tracking-widest">
-                STATEMENT OF MARKS
-              </div>
+              <div className="text-center font-black text-base underline uppercase tracking-widest">STATEMENT OF MARKS</div>
 
-              <div className="flex justify-between items-start gap-4 border-2 border-slate-900 p-4 rounded-lg bg-slate-50">
-                <div className="grid grid-cols-2 gap-x-6 gap-y-2 flex-1 text-xs">
-                  <div><span className="font-extrabold text-slate-700">PROGRAMME:</span> <span className="font-bold text-slate-900">{viewingMarksheet.course_name}</span></div>
-                  <div><span className="font-extrabold text-slate-700">SESSION:</span> <span className="font-bold text-slate-900">{viewingMarksheet.session}</span></div>
-                  <div><span className="font-extrabold text-slate-700">ROLL NO:</span> <span className="font-black text-sky-700">{viewingMarksheet.roll_no}</span></div>
-                  <div><span className="font-extrabold text-slate-700">ENROLLMENT NO:</span> <span className="font-black text-sky-800">{viewingMarksheet.enrollment_no}</span></div>
-                  <div><span className="font-extrabold text-slate-700">CANDIDATE NAME:</span> <span className="font-extrabold text-slate-900">{viewingMarksheet.student_name}</span></div>
-                  <div><span className="font-extrabold text-slate-700">FATHER'S NAME:</span> <span className="font-bold text-slate-900">{viewingMarksheet.father_name}</span></div>
-                  <div><span className="font-extrabold text-slate-700">MOTHER'S NAME:</span> <span className="font-bold text-slate-900">{viewingMarksheet.mother_name || 'N/A'}</span></div>
-                  <div><span className="font-extrabold text-slate-700">DATE OF BIRTH:</span> <span className="font-bold text-slate-900">{viewingMarksheet.dob || 'N/A'}</span></div>
-                  <div className="col-span-2"><span className="font-extrabold text-slate-700">STUDY CENTER:</span> <span className="font-bold text-slate-900">{viewingMarksheet.study_center}</span></div>
+              <div className="flex justify-between items-start gap-4 border-2 border-black p-4">
+                <div className="grid grid-cols-2 gap-x-6 gap-y-3 flex-1 text-xs">
+                  <div><span className="font-extrabold">PROGRAMME:</span> <span className="font-bold">{viewingMarksheet.course_name}</span></div>
+                  <div><span className="font-extrabold">SESSION:</span> <span className="font-bold">{viewingMarksheet.session}</span></div>
+                  <div><span className="font-extrabold">ROLL NO:</span> <span className="font-black">{viewingMarksheet.roll_no}</span></div>
+                  <div><span className="font-extrabold">ENROLLMENT NO:</span> <span className="font-black">{viewingMarksheet.enrollment_no}</span></div>
+                  <div><span className="font-extrabold">CANDIDATE NAME:</span> <span className="font-extrabold">{viewingMarksheet.student_name}</span></div>
+                  <div><span className="font-extrabold">FATHER'S NAME:</span> <span className="font-bold">{viewingMarksheet.father_name}</span></div>
+                  <div><span className="font-extrabold">MOTHER'S NAME:</span> <span className="font-bold">{viewingMarksheet.mother_name || 'N/A'}</span></div>
+                  <div><span className="font-extrabold">DATE OF BIRTH:</span> <span className="font-bold">{formatDate(viewingMarksheet.dob) || 'N/A'}</span></div>
+                  <div className="col-span-2"><span className="font-extrabold">STUDY CENTER:</span> <span className="font-bold">{viewingMarksheet.study_center}</span></div>
                 </div>
 
                 <div className="text-center shrink-0">
-                  <div className="text-[10px] font-bold text-slate-800 mb-1">DOC NO: {viewingMarksheet.serial_no}</div>
+                  <div className="text-[10px] font-bold mb-1">DOC NO: {viewingMarksheet.serial_no}</div>
                   <img
-                    src={viewingMarksheet.photo_url || 'https://iili.io/CNGWoTG.md.jpg'}
+                    src={viewingMarksheet.photo_url || PLACEHOLDER_PHOTO}
                     alt="Photo"
-                    className="w-20 h-24 object-cover border-2 border-slate-900 rounded bg-white shadow-sm"
+                    className="w-20 h-24 object-cover border-2 border-black bg-white"
                   />
                 </div>
               </div>
 
-              {/* MARKS TABLE */}
-              <table className="w-full border-collapse border-2 border-slate-900 text-center text-xs">
-                <thead className="bg-slate-100 font-extrabold">
-                  <tr className="border-b-2 border-slate-900">
-                    <th className="p-2 border-r border-slate-900">PAPER CODE</th>
-                    <th className="p-2 border-r border-slate-900 text-left pl-3">EXAM / PAPER NAME</th>
-                    <th className="p-2 border-r border-slate-900">MAX MARKS</th>
-                    <th className="p-2 border-r border-slate-900">THEORY (100)</th>
-                    <th className="p-2 border-r border-slate-900">PRACTICAL (50)</th>
-                    <th className="p-2">TOTAL</th>
+              <table className="w-full border-collapse border-2 border-black text-center text-xs">
+                <thead className="font-extrabold">
+                  <tr className="border-b-2 border-black">
+                    <th className="p-3 border-r border-black">PAPER CODE</th>
+                    <th className="p-3 border-r border-black text-left pl-3">EXAM / PAPER NAME</th>
+                    <th className="p-3 border-r border-black">MAX MARKS</th>
+                    <th className="p-3 border-r border-black">THEORY (100)</th>
+                    <th className="p-3 border-r border-black">PRACTICAL (50)</th>
+                    <th className="p-3">TOTAL</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y border-slate-900 font-semibold">
+                <tbody className="font-semibold">
                   {viewingMarksheet.subjects.map((sub, i) => (
-                    <tr key={i} className="border-b border-slate-900">
-                      <td className="p-2 border-r border-slate-900 font-mono font-bold">{sub.paper_code}</td>
-                      <td className="p-2 border-r border-slate-900 text-left pl-3 uppercase">{sub.paper_name}</td>
-                      <td className="p-2 border-r border-slate-900">{sub.max_marks}</td>
-                      <td className="p-2 border-r border-slate-900">{sub.theory}</td>
-                      <td className="p-2 border-r border-slate-900">{sub.practical}</td>
-                      <td className="p-2 font-bold text-slate-900">{sub.total_marks}</td>
+                    <tr key={i} className="border-b border-black">
+                      <td className="p-3 border-r border-black font-mono font-bold">{sub.paper_code}</td>
+                      <td className="p-3 border-r border-black text-left pl-3 uppercase">{sub.paper_name}</td>
+                      <td className="p-3 border-r border-black">{sub.max_marks}</td>
+                      <td className="p-3 border-r border-black">{sub.theory}</td>
+                      <td className="p-3 border-r border-black">{sub.practical}</td>
+                      <td className="p-3 font-bold">{sub.total_marks}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
 
-              {/* SUMMARY BOX */}
-              <div className="flex justify-between items-center border-2 border-slate-900 p-3 bg-slate-50 font-extrabold text-xs">
-                <div>GRAND TOTAL: <span className="text-sky-700 ml-1">{viewingMarksheet.grand_total_obtained} / {viewingMarksheet.grand_total_max}</span></div>
-                <div>PERCENTAGE: <span className="text-slate-900 ml-1">{viewingMarksheet.percentage}%</span></div>
-                <div>FINAL GRADE: <span className="text-emerald-700 ml-1">{viewingMarksheet.grade}</span></div>
+              <div className="flex justify-between items-center border-2 border-black p-3 font-extrabold text-xs">
+                <div>GRAND TOTAL: {viewingMarksheet.grand_total_obtained} / {viewingMarksheet.grand_total_max}</div>
+                <div>PERCENTAGE: {viewingMarksheet.percentage}%</div>
+                <div>FINAL GRADE: {viewingMarksheet.grade}</div>
               </div>
 
-              {/* FOOTER WITH QR CODE */}
               <div className="flex justify-between items-end pt-4">
                 <div className="text-center w-36">
-                  <img src="/authorised-signature.png" alt="Sign" className="h-8 object-contain mx-auto mb-1" onError={(e: any) => e.target.style.display='none'} />
-                  <div className="border-t border-slate-900 pt-1 text-[9px] font-bold uppercase">DIRECTOR (MITM)</div>
+                  <img src="/authorised-signature.png" alt="Sign" className="h-8 object-contain mx-auto mb-1" onError={(e: any) => (e.target.style.display = 'none')} />
+                  <div className="border-t border-black pt-1 text-[9px] font-bold uppercase">DIRECTOR (MITM)</div>
                 </div>
 
                 <div className="text-center">
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(
-                      `Verified
-Name: ${viewingMarksheet.student_name}
-Roll No: ${viewingMarksheet.roll_no}
-Course: ${viewingMarksheet.course_name}
-DOB: ${viewingMarksheet.dob || 'N/A'}
-Date of Issue: ${viewingMarksheet.issue_date}`
-                    )}`}
-                    alt="QR"
-                    className="w-16 h-16 mx-auto mb-1 border p-1 bg-white"
-                  />
-                  <div className="text-[8px] font-black uppercase text-slate-700">SCAN TO VERIFY</div>
+                  <img src={buildQrUrl(viewingMarksheet, 120)} alt="QR" className="w-16 h-16 mx-auto mb-1 border border-black p-1 bg-white" />
+                  <div className="text-[8px] font-black uppercase">SCAN TO VERIFY</div>
                 </div>
 
                 <div className="text-center w-36">
-                  <div className="text-[10px] font-bold mb-4">DATE: {viewingMarksheet.issue_date}</div>
-                  <div className="border-t border-slate-900 pt-1 text-[9px] font-bold uppercase">CHIEF EXAM CONTROLLER</div>
+                  <div className="text-[10px] font-bold mb-4">DATE: {formatDate(viewingMarksheet.issue_date)}</div>
+                  <div className="border-t border-black pt-1 text-[9px] font-bold uppercase">CHIEF EXAM CONTROLLER</div>
                 </div>
               </div>
             </div>

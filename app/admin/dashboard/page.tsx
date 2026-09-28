@@ -1,9 +1,11 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { text } from 'stream/consumers';
 import { supabase } from '@/lib/supabase';
+import MarksheetTab from '@/components/MarksheetTab';
+import CertificateTab from '@/components/CertificateTab';
 
 // ============================================================================
 // DATA INTERFACES
@@ -78,137 +80,107 @@ const exportToExcel = (data: any[], filename: string) => {
 export default function MITMAdminMasterDashboard() {
   const router = useRouter();
 
+  // Guard: only the logged-in Main Admin can view this dashboard
+  useEffect(() => {
+    const adminSessionStr = localStorage.getItem('admin_session');
+    if (!adminSessionStr) {
+      router.push('/login');
+    }
+  }, []);
+
   // Active Main Tab (6 Tabs)
   const [activeTab, setActiveTab] = useState<'branches' | 'queue' | 'students' | 'idcards' | 'marksheets' | 'certificates'>('branches');
 
   // Pre-printed Letterhead Toggle
   const [isLetterhead, setIsLetterhead] = useState(false);
 
-  // Tab 1: Branches Data
-  const [branchesList, setBranchesList] = useState<BranchInstitute[]>([
-    {
-      id: 'b1',
-      institute_code: 'MITM-CHANDAUSI',
-      institute_name: 'MITM Chandausi Campus',
-      address: 'Main Road, Near Railway Station, Chandausi',
-      mobile_no: '9876543210',
-      email: 'chandausi@manavtainstitute.com',
-      password: 'chandausi@123',
-      head_name: 'Dr. R.K. Sharma',
-      head_qualification: 'M.Tech, Ph.D Computer Science',
-      head_aadhar_no: '987654321012',
-      head_photo_url: 'https://iili.io/3jruEzl.md.jpg',
-      created_at: '2025-08-01'
-    },
-    {
-      id: 'b2',
-      institute_code: 'MITM-BILARI',
-      institute_name: 'MITM Bilari Branch',
-      address: 'Station Road, Bilari, Moradabad',
-      mobile_no: '9123456789',
-      email: 'bilari@manavtainstitute.com',
-      password: 'bilari@123',
-      head_name: 'Prof. S.P. Verma',
-      head_qualification: 'MCA, M.Phil',
-      head_aadhar_no: '876543210987',
-      head_photo_url: 'https://iili.io/3jruEzl.md.jpg',
-      created_at: '2025-08-05'
-    }
-  ]);
+  // Tab 1: Branches Data - loaded from Supabase `branches` table
+  const [branchesList, setBranchesList] = useState<BranchInstitute[]>([]);
 
-  // Tab 2: Queue Submissions
-  const [studentsQueue, setStudentsQueue] = useState<StudentRecord[]>([
-    {
-      id: 'q1',
-      enrollment_no: 'PENDING-001',
-      roll_no: 'UNASSIGNED',
-      serial_no: 'DN-9901',
-      student_name: 'VIKRAM SINGH',
-      father_name: 'RAJESH SINGH',
-      mother_name: 'SUNITA DEVI',
-      course_name: 'Advance Diploma In Computer Software',
-      admission_date: '2025-09-01',
-      session: '2025-2027',
-      dob: '2003-05-12',
-      qualification: '12th Pass',
-      mobile_no: '9876500111',
-      alt_mobile_no: '9876500112',
-      aadhar_no: '456789012345',
-      photo_url: 'https://iili.io/3jruEzl.md.jpg',
-      address: 'Near Bus Stand, Bilari',
-      study_center: 'MITM Bilari Branch',
-      status: 'PENDING_APPROVAL',
-      branch_code: 'MITM-BILARI'
-    },
-    {
-      id: 'q2',
-      enrollment_no: 'PENDING-002',
-      roll_no: 'UNASSIGNED',
-      serial_no: 'DN-9902',
-      student_name: 'POOJA SHARMA',
-      father_name: 'RAMESH SHARMA',
-      mother_name: 'GEETA SHARMA',
-      course_name: 'Computerised Professional Accounting Course',
-      admission_date: '2025-09-02',
-      session: '2025-2027',
-      dob: '2002-11-20',
-      qualification: 'B.Com Graduate',
-      mobile_no: '9876500222',
-      aadhar_no: '567890123456',
-      photo_url: 'https://iili.io/3jruEzl.md.jpg',
-      address: 'Civil Lines, Chandausi',
-      study_center: 'MITM Chandausi Campus',
-      status: 'PENDING_APPROVAL',
-      branch_code: 'MITM-CHANDAUSI'
-    }
-  ]);
+  // Tab 2: Queue Submissions - loaded from Supabase `students` table (status = PENDING_APPROVAL)
+  const [studentsQueue, setStudentsQueue] = useState<StudentRecord[]>([]);
 
-  // Tab 3 & 4: Master Student Records
-  const [studentsList, setStudentsList] = useState<StudentRecord[]>([
-    {
-      id: 's1',
-      enrollment_no: '1039954701',
-      roll_no: '103801',
-      serial_no: 'DN-3754',
-      student_name: 'SHREYA CHUG',
-      father_name: 'MOHAN CHUG',
-      mother_name: 'SANGEETA CHUG',
-      course_name: 'Computerised Professional Accounting Course',
-      admission_date: '2025-07-15',
-      session: '2025-2027',
-      dob: '2002-04-10',
-      qualification: 'B.Com',
-      mobile_no: '9876123450',
-      alt_mobile_no: '9876123451',
-      aadhar_no: '123456789012',
-      photo_url: 'https://iili.io/3jruEzl.md.jpg',
-      address: 'Main Market, Bilari, Moradabad',
-      study_center: 'Manavta Institute of Education - Bilari Campus',
-      status: 'APPROVED',
-      branch_code: 'MITM-BILARI'
-    },
-    {
-      id: 's2',
-      enrollment_no: '1039954702',
-      roll_no: '103802',
-      serial_no: 'DN-3762',
-      student_name: 'BANTY',
-      father_name: 'RAMESH KUMAR',
-      mother_name: 'SUDESH DEVI',
-      course_name: 'Desktop Publishing (DTP)',
-      admission_date: '2025-08-01',
-      session: '2025-2026',
-      dob: '2001-08-15',
-      qualification: '12th Pass',
-      mobile_no: '9876234561',
-      aadhar_no: '234567890123',
-      photo_url: 'https://iili.io/3jruEzl.md.jpg',
-      address: 'Railway Colony, Chandausi',
-      study_center: 'Manavta Institute of Education - Chandausi Campus',
-      status: 'APPROVED',
-      branch_code: 'MITM-CHANDAUSI'
+  // Tab 3 & 4: Master Student Records - loaded from Supabase `students` table (status = APPROVED)
+  const [studentsList, setStudentsList] = useState<StudentRecord[]>([]);
+
+  const [isLoadingData, setIsLoadingData] = useState(true);
+
+  // -------------------------------------------------------------------------
+  // Map a raw Supabase `students` row -> StudentRecord shape used by the UI
+  // -------------------------------------------------------------------------
+  const mapDbRowToStudent = (s: any): StudentRecord => ({
+    id: s.id,
+    enrollment_no: s.enrollment_no && s.enrollment_no.startsWith('PENDING-') ? 'PENDING' : s.enrollment_no,
+    roll_no: s.roll_no || 'UNASSIGNED',
+    serial_no: s.serial_no || '',
+    student_name: s.student_name,
+    father_name: s.father_name,
+    mother_name: s.mother_name || '',
+    course_name: s.course_name,
+    admission_date: s.admission_date,
+    session: s.session || '',
+    dob: s.dob || '',
+    qualification: s.qualification || '',
+    mobile_no: s.mobile_no || '',
+    alt_mobile_no: s.alt_mobile_no || '',
+    aadhar_no: s.aadhar_no || '',
+    photo_url: s.photo_url || 'https://iili.io/3jruEzl.md.jpg',
+    address: s.address || '',
+    study_center: s.study_center || 'MITM',
+    status: s.status === 'APPROVED' ? 'APPROVED' : 'PENDING_APPROVAL',
+    branch_code: s.branch_code || ''
+  });
+
+  // -------------------------------------------------------------------------
+  // Load everything from Supabase (branches + students) on page load,
+  // so data survives refresh / login-logout.
+  // -------------------------------------------------------------------------
+  const fetchAllData = async () => {
+    setIsLoadingData(true);
+
+    // Run both queries in parallel instead of one-after-another - much faster
+    const [branchResult, studentResult] = await Promise.all([
+      supabase.from('branches').select('*').order('created_at', { ascending: false }),
+      supabase.from('students').select('*').order('created_at', { ascending: false })
+    ]);
+
+    if (branchResult.error) {
+      console.error('Fetch branches error:', branchResult.error);
+      alert('❌ Failed to load branches: ' + branchResult.error.message);
+    } else {
+      setBranchesList(
+        (branchResult.data || []).map((b: any) => ({
+          id: b.id,
+          institute_code: b.institute_code,
+          institute_name: b.institute_name,
+          address: b.address || '',
+          mobile_no: b.mobile_no,
+          email: b.email || '',
+          password: b.password,
+          head_name: b.head_name || '',
+          head_qualification: b.head_qualification || '',
+          head_aadhar_no: b.head_aadhar_no || '',
+          head_photo_url: b.head_photo_url || 'https://iili.io/3jruEzl.md.jpg',
+          created_at: b.created_at ? String(b.created_at).split('T')[0] : ''
+        }))
+      );
     }
-  ]);
+
+    if (studentResult.error) {
+      console.error('Fetch students error:', studentResult.error);
+      alert('❌ Failed to load students: ' + studentResult.error.message);
+    } else {
+      const mapped = (studentResult.data || []).map(mapDbRowToStudent);
+      setStudentsQueue(mapped.filter((s) => s.status === 'PENDING_APPROVAL'));
+      setStudentsList(mapped.filter((s) => s.status === 'APPROVED'));
+    }
+
+    setIsLoadingData(false);
+  };
+
+  useEffect(() => {
+    fetchAllData();
+  }, []);
 
   // Tab 1: New Branch Form State
   const [newBranch, setNewBranch] = useState({
@@ -373,44 +345,96 @@ export default function MITMAdminMasterDashboard() {
     alert("✅ Branch Registered Successfully & Saved to Database!");
   };
 
-  const handleUpdateBranch = (e: React.FormEvent) => {
+  const handleUpdateBranch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingBranch) return;
-    setBranchesList(branchesList.map(b => b.id === editingBranch.id ? editingBranch : b));
+
+    const { data, error } = await supabase
+      .from('branches')
+      .update({
+        institute_name: editingBranch.institute_name,
+        mobile_no: editingBranch.mobile_no,
+        email: editingBranch.email,
+        address: editingBranch.address,
+        head_name: editingBranch.head_name,
+        head_qualification: editingBranch.head_qualification,
+        head_aadhar_no: editingBranch.head_aadhar_no
+      })
+      .eq('id', editingBranch.id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Update branch error:', error);
+      alert('❌ Failed to update branch: ' + error.message);
+      return;
+    }
+
+    setBranchesList(branchesList.map(b => b.id === data.id ? { ...b, ...data } : b));
     setEditingBranch(null);
     alert("✅ Branch Details Updated Successfully!");
   };
 
-  const handleDeleteBranchWithData = (branchCode: string) => {
-    if (confirm(`⚠️ WARNING: Are you sure you want to delete branch ${branchCode} along with ALL its submitted student records?`)) {
-      setBranchesList(branchesList.filter(b => b.institute_code !== branchCode));
-      setStudentsQueue(studentsQueue.filter(q => q.branch_code !== branchCode));
-      setStudentsList(studentsList.filter(s => s.branch_code !== branchCode));
-      alert("Branch and associated data deleted!");
+  const handleDeleteBranchWithData = async (branchCode: string) => {
+    if (!confirm(`⚠️ WARNING: Are you sure you want to delete branch ${branchCode} along with ALL its submitted student records?`)) return;
+
+    const { error: studentsErr } = await supabase.from('students').delete().eq('branch_code', branchCode);
+    if (studentsErr) {
+      alert('❌ Failed to delete branch students: ' + studentsErr.message);
+      return;
     }
+
+    const { error: branchErr } = await supabase.from('branches').delete().eq('institute_code', branchCode);
+    if (branchErr) {
+      alert('❌ Failed to delete branch: ' + branchErr.message);
+      return;
+    }
+
+    setBranchesList(branchesList.filter(b => b.institute_code !== branchCode));
+    setStudentsQueue(studentsQueue.filter(q => q.branch_code !== branchCode));
+    setStudentsList(studentsList.filter(s => s.branch_code !== branchCode));
+    alert("Branch and associated data deleted!");
   };
 
-  const handleDeleteBranchKeepData = (branchCode: string) => {
-    if (confirm(`Are you sure you want to delete branch profile ${branchCode} while keeping student records intact?`)) {
-      setBranchesList(branchesList.filter(b => b.institute_code !== branchCode));
-      alert("Branch profile removed. Student records kept intact!");
+  const handleDeleteBranchKeepData = async (branchCode: string) => {
+    if (!confirm(`Are you sure you want to delete branch profile ${branchCode} while keeping student records intact?`)) return;
+
+    const { error } = await supabase.from('branches').delete().eq('institute_code', branchCode);
+    if (error) {
+      alert('❌ Failed to delete branch: ' + error.message);
+      return;
     }
+
+    setBranchesList(branchesList.filter(b => b.institute_code !== branchCode));
+    alert("Branch profile removed. Student records kept intact!");
   };
 
   // TAB 2 HANDLERS
-  const handleAssignSingleStudent = (e: React.FormEvent) => {
+  const handleAssignSingleStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!assigningStudent || !assignRoll || !assignEnrollment) {
       alert("Roll No & Enrollment No are required!");
       return;
     }
 
-    const mergedStudent: StudentRecord = {
-      ...assigningStudent,
-      roll_no: assignRoll.trim(),
-      enrollment_no: assignEnrollment.trim(),
-      status: 'APPROVED'
-    };
+    const { data, error } = await supabase
+      .from('students')
+      .update({
+        roll_no: assignRoll.trim(),
+        enrollment_no: assignEnrollment.trim(),
+        status: 'APPROVED'
+      })
+      .eq('id', assigningStudent.id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Assign/merge update error:', error);
+      alert('❌ Failed to merge student: ' + error.message);
+      return;
+    }
+
+    const mergedStudent = mapDbRowToStudent(data);
 
     setStudentsList([mergedStudent, ...studentsList]);
     setStudentsQueue(studentsQueue.filter(q => q.id !== assigningStudent.id));
@@ -420,26 +444,53 @@ export default function MITMAdminMasterDashboard() {
     alert(`✅ Student ${mergedStudent.student_name} merged to Master Records with Roll No: ${mergedStudent.roll_no}!`);
   };
 
-  const handleBulkAutoAssignMerge = () => {
+  const handleBulkAutoAssignMerge = async () => {
     if (!studentsQueue.length) {
       alert("No students in queue to merge!");
       return;
     }
 
-    if (confirm(`🚀 Auto-assign Roll Nos and merge ALL ${studentsQueue.length} queue students to Central Master Records?`)) {
-      let startRoll = 103800 + studentsList.length + 1;
-      let startEnr = 1039954700 + studentsList.length + 1;
+    if (!confirm(`🚀 Auto-assign Roll Nos and merge ALL ${studentsQueue.length} queue students to Central Master Records?`)) {
+      return;
+    }
 
-      const newlyApproved: StudentRecord[] = studentsQueue.map((s, idx) => ({
-        ...s,
-        roll_no: String(startRoll + idx),
-        enrollment_no: String(startEnr + idx),
-        status: 'APPROVED'
-      }));
+    let startRoll = 103800 + studentsList.length + 1;
+    let startEnr = 1039954700 + studentsList.length + 1;
+
+    try {
+      const updatePromises = studentsQueue.map((s, idx) =>
+        supabase
+          .from('students')
+          .update({
+            roll_no: String(startRoll + idx),
+            enrollment_no: String(startEnr + idx),
+            status: 'APPROVED'
+          })
+          .eq('id', s.id)
+          .select()
+          .single()
+      );
+
+      const results = await Promise.all(updatePromises);
+
+      const failed = results.filter(r => r.error);
+      if (failed.length > 0) {
+        console.error('Bulk merge errors:', failed.map(f => f.error));
+        alert(`⚠️ ${failed.length} student(s) failed to merge. Check console for details.`);
+      }
+
+      const newlyApproved = results.filter(r => !r.error && r.data).map(r => mapDbRowToStudent(r.data));
+      const mergedIds = new Set(newlyApproved.map(s => s.id));
 
       setStudentsList([...newlyApproved, ...studentsList]);
-      setStudentsQueue([]);
-      alert(`🎉 Successfully Auto-Assigned & Merged ${newlyApproved.length} Students to Master Records!`);
+      setStudentsQueue(studentsQueue.filter(q => !mergedIds.has(q.id)));
+
+      if (newlyApproved.length > 0) {
+        alert(`🎉 Successfully Auto-Assigned & Merged ${newlyApproved.length} Students to Master Records!`);
+      }
+    } catch (err: any) {
+      console.error('Bulk merge failed:', err);
+      alert('❌ Bulk merge failed: ' + err.message);
     }
   };
 
@@ -470,8 +521,7 @@ export default function MITMAdminMasterDashboard() {
       return;
     }
 
-    const studentRecord: StudentRecord = {
-      id: 's-' + Date.now(),
+    const payload = {
       roll_no: newStudentForm.roll_no.trim(),
       enrollment_no: newStudentForm.enrollment_no.trim(),
       serial_no: newStudentForm.serial_no.trim(),
@@ -493,6 +543,19 @@ export default function MITMAdminMasterDashboard() {
       branch_code: 'HEAD_OFFICE'
     };
 
+    const { data, error } = await supabase
+      .from('students')
+      .insert([payload])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Direct student insert error:', error);
+      alert('❌ Failed to save student to database: ' + error.message);
+      return;
+    }
+
+    const studentRecord = mapDbRowToStudent(data);
     setStudentsList([studentRecord, ...studentsList]);
 
 
@@ -516,34 +579,80 @@ export default function MITMAdminMasterDashboard() {
       study_center: 'MITM Bilari Campus'
     });
 
-    alert("✅ Direct Student Registered & Added to Master Records!");
+    alert("✅ Direct Student Registered & Saved to Database!");
   };
 
-  const handleUpdateStudent = (e: React.FormEvent) => {
+  const handleUpdateStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingStudent) return;
-    setStudentsList(studentsList.map(s => s.id === editingStudent.id ? editingStudent : s));
+
+    const { data, error } = await supabase
+      .from('students')
+      .update({
+        student_name: editingStudent.student_name,
+        father_name: editingStudent.father_name,
+        mother_name: editingStudent.mother_name || null,
+        roll_no: editingStudent.roll_no,
+        enrollment_no: editingStudent.enrollment_no,
+        serial_no: editingStudent.serial_no || null,
+        course_name: editingStudent.course_name,
+        session: editingStudent.session || null,
+        admission_date: editingStudent.admission_date,
+        dob: editingStudent.dob || null,
+        qualification: editingStudent.qualification || null,
+        mobile_no: editingStudent.mobile_no || null,
+        alt_mobile_no: editingStudent.alt_mobile_no || null,
+        aadhar_no: editingStudent.aadhar_no || null,
+        address: editingStudent.address || null,
+        study_center: editingStudent.study_center
+      })
+      .eq('id', editingStudent.id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Update student error:', error);
+      alert('❌ Failed to update student: ' + error.message);
+      return;
+    }
+
+    const updated = mapDbRowToStudent(data);
+    setStudentsList(studentsList.map(s => s.id === updated.id ? updated : s));
     setEditingStudent(null);
     alert("✅ Student Record Updated!");
   };
 
-  const handleDeleteSingleStudent = (id: string) => {
-    if (confirm("Are you sure you want to delete this student record?")) {
-      setStudentsList(studentsList.filter(s => s.id !== id));
-      setSelectedStudentIds(selectedStudentIds.filter(i => i !== id));
+  const handleDeleteSingleStudent = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this student record?")) return;
+
+    const { error } = await supabase.from('students').delete().eq('id', id);
+    if (error) {
+      console.error('Delete student error:', error);
+      alert('❌ Failed to delete student: ' + error.message);
+      return;
     }
+
+    setStudentsList(studentsList.filter(s => s.id !== id));
+    setSelectedStudentIds(selectedStudentIds.filter(i => i !== id));
   };
 
-  const handleDeleteSelectedStudents = () => {
+  const handleDeleteSelectedStudents = async () => {
     if (!selectedStudentIds.length) {
       alert("No students selected!");
       return;
     }
-    if (confirm(`Are you sure you want to delete ${selectedStudentIds.length} selected student records?`)) {
-      setStudentsList(studentsList.filter(s => !selectedStudentIds.includes(s.id)));
-      setSelectedStudentIds([]);
-      alert("Selected student records deleted!");
+    if (!confirm(`Are you sure you want to delete ${selectedStudentIds.length} selected student records?`)) return;
+
+    const { error } = await supabase.from('students').delete().in('id', selectedStudentIds);
+    if (error) {
+      console.error('Bulk delete error:', error);
+      alert('❌ Failed to delete selected students: ' + error.message);
+      return;
     }
+
+    setStudentsList(studentsList.filter(s => !selectedStudentIds.includes(s.id)));
+    setSelectedStudentIds([]);
+    alert("Selected student records deleted!");
   };
 
   // =========================================================================
@@ -780,7 +889,10 @@ window.onload = function() {
 
           <div className="flex items-center gap-3">
             <button
-              onClick={() => router.push('/')}
+              onClick={() => {
+                localStorage.removeItem('admin_session');
+                router.push('/login');
+              }}
               className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow transition"
             >
               🚪 Logout
@@ -826,6 +938,24 @@ window.onload = function() {
               }`}
             >
               <span>🪪</span> Tab 4: ID Card Print ({studentsList.length})
+            </button>
+
+            <button
+              onClick={() => setActiveTab('marksheets')}
+              className={`px-4 py-2 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                activeTab === 'marksheets' ? 'bg-sky-600 text-white shadow' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+              }`}
+            >
+              <span>📊</span> Tab 5: Student Marksheet
+            </button>
+
+            <button
+              onClick={() => setActiveTab('certificates')}
+              className={`px-4 py-2 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                activeTab === 'certificates' ? 'bg-sky-600 text-white shadow' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+              }`}
+            >
+              <span>📜</span> Tab 6: Student Certificate
             </button>
 
           </div>
@@ -1571,11 +1701,15 @@ window.onload = function() {
 
                 {selectedIdCardIds.length > 0 && (
                   <button
-                    onClick={() => {
-                      if (confirm(`Delete ${selectedIdCardIds.length} selected ID card records?`)) {
-                        setStudentsList(studentsList.filter(s => !selectedIdCardIds.includes(s.id)));
-                        setSelectedIdCardIds([]);
+                    onClick={async () => {
+                      if (!confirm(`Delete ${selectedIdCardIds.length} selected ID card records?`)) return;
+                      const { error } = await supabase.from('students').delete().in('id', selectedIdCardIds);
+                      if (error) {
+                        alert('❌ Failed to delete: ' + error.message);
+                        return;
                       }
+                      setStudentsList(studentsList.filter(s => !selectedIdCardIds.includes(s.id)));
+                      setSelectedIdCardIds([]);
                     }}
                     className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow transition"
                   >
@@ -1660,6 +1794,14 @@ window.onload = function() {
             </div>
           </div>
         )}
+
+        {/* TAB 5: STUDENT MARKSHEET (data saved in Supabase `marksheets`) */}
+        {activeTab === 'marksheets' && (
+          <MarksheetTab studentsList={studentsList} isLetterhead={isLetterhead} setIsLetterhead={setIsLetterhead} />
+        )}
+
+        {/* TAB 6: STUDENT CERTIFICATE (data saved in Supabase `certificates`) */}
+        {activeTab === 'certificates' && <CertificateTab studentsList={studentsList} />}
       </main>
 
       {/* MODALS */}
@@ -1781,75 +1923,139 @@ window.onload = function() {
         </div>
       )}
 
-      {/* 3. EDIT STUDENT MODAL */}
+      {/* 3. EDIT STUDENT MODAL - Full Details */}
       {editingStudent && (
         <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b pb-2">
-              <h3 className="font-bold text-slate-900 text-sm uppercase">✏️ Edit Student Master Record</h3>
+              <h3 className="font-bold text-slate-900 text-sm uppercase">✏️ Edit Student Master Record (Full Details)</h3>
               <button onClick={() => setEditingStudent(null)} className="text-slate-400 font-bold">✕</button>
             </div>
 
             <form onSubmit={handleUpdateStudent} className="space-y-3 text-xs">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 <div>
                   <label className="font-bold">Student Name</label>
-                  <input
-                    type="text"
-                    value={editingStudent.student_name}
-                    onChange={(e) => setEditingStudent({ ...editingStudent, student_name: e.target.value })}
-                    className="w-full px-2 py-1.5 border rounded font-bold uppercase"
-                  />
+                  <input type="text" value={editingStudent.student_name} onChange={(e) => setEditingStudent({ ...editingStudent, student_name: e.target.value })} className="w-full px-2 py-1.5 border rounded font-bold uppercase" />
                 </div>
                 <div>
                   <label className="font-bold">Father's Name</label>
-                  <input
-                    type="text"
-                    value={editingStudent.father_name}
-                    onChange={(e) => setEditingStudent({ ...editingStudent, father_name: e.target.value })}
-                    className="w-full px-2 py-1.5 border rounded font-bold uppercase"
-                  />
+                  <input type="text" value={editingStudent.father_name} onChange={(e) => setEditingStudent({ ...editingStudent, father_name: e.target.value })} className="w-full px-2 py-1.5 border rounded font-bold uppercase" />
+                </div>
+                <div>
+                  <label className="font-bold">Mother's Name</label>
+                  <input type="text" value={editingStudent.mother_name || ''} onChange={(e) => setEditingStudent({ ...editingStudent, mother_name: e.target.value })} className="w-full px-2 py-1.5 border rounded uppercase" />
                 </div>
                 <div>
                   <label className="font-bold">Roll No</label>
-                  <input
-                    type="text"
-                    value={editingStudent.roll_no}
-                    onChange={(e) => setEditingStudent({ ...editingStudent, roll_no: e.target.value })}
-                    className="w-full px-2 py-1.5 border rounded font-bold"
-                  />
+                  <input type="text" value={editingStudent.roll_no} onChange={(e) => setEditingStudent({ ...editingStudent, roll_no: e.target.value })} className="w-full px-2 py-1.5 border rounded font-bold" />
                 </div>
                 <div>
                   <label className="font-bold">Enrollment No</label>
-                  <input
-                    type="text"
-                    value={editingStudent.enrollment_no}
-                    onChange={(e) => setEditingStudent({ ...editingStudent, enrollment_no: e.target.value })}
-                    className="w-full px-2 py-1.5 border rounded font-bold"
-                  />
+                  <input type="text" value={editingStudent.enrollment_no} onChange={(e) => setEditingStudent({ ...editingStudent, enrollment_no: e.target.value })} className="w-full px-2 py-1.5 border rounded font-bold" />
+                </div>
+                <div>
+                  <label className="font-bold">Document No</label>
+                  <input type="text" value={editingStudent.serial_no || ''} onChange={(e) => setEditingStudent({ ...editingStudent, serial_no: e.target.value })} className="w-full px-2 py-1.5 border rounded" />
                 </div>
                 <div>
                   <label className="font-bold">Course Name</label>
-                  <input
-                    type="text"
-                    value={editingStudent.course_name}
-                    onChange={(e) => setEditingStudent({ ...editingStudent, course_name: e.target.value })}
-                    className="w-full px-2 py-1.5 border rounded"
-                  />
+                  <input type="text" value={editingStudent.course_name} onChange={(e) => setEditingStudent({ ...editingStudent, course_name: e.target.value })} className="w-full px-2 py-1.5 border rounded" />
                 </div>
                 <div>
                   <label className="font-bold">Session</label>
-                  <input
-                    type="text"
-                    value={editingStudent.session}
-                    onChange={(e) => setEditingStudent({ ...editingStudent, session: e.target.value })}
-                    className="w-full px-2 py-1.5 border rounded"
-                  />
+                  <input type="text" value={editingStudent.session || ''} onChange={(e) => setEditingStudent({ ...editingStudent, session: e.target.value })} className="w-full px-2 py-1.5 border rounded" />
+                </div>
+                <div>
+                  <label className="font-bold">Admission Date</label>
+                  <input type="text" value={editingStudent.admission_date} onChange={(e) => setEditingStudent({ ...editingStudent, admission_date: e.target.value })} className="w-full px-2 py-1.5 border rounded" />
+                </div>
+                <div>
+                  <label className="font-bold">DOB</label>
+                  <input type="text" value={editingStudent.dob || ''} onChange={(e) => setEditingStudent({ ...editingStudent, dob: e.target.value })} className="w-full px-2 py-1.5 border rounded" />
+                </div>
+                <div>
+                  <label className="font-bold">Qualification</label>
+                  <input type="text" value={editingStudent.qualification || ''} onChange={(e) => setEditingStudent({ ...editingStudent, qualification: e.target.value })} className="w-full px-2 py-1.5 border rounded" />
+                </div>
+                <div>
+                  <label className="font-bold">Mobile No</label>
+                  <input type="text" value={editingStudent.mobile_no || ''} onChange={(e) => setEditingStudent({ ...editingStudent, mobile_no: e.target.value })} className="w-full px-2 py-1.5 border rounded" />
+                </div>
+                <div>
+                  <label className="font-bold">Alt Mobile No</label>
+                  <input type="text" value={editingStudent.alt_mobile_no || ''} onChange={(e) => setEditingStudent({ ...editingStudent, alt_mobile_no: e.target.value })} className="w-full px-2 py-1.5 border rounded" />
+                </div>
+                <div>
+                  <label className="font-bold">Aadhar No</label>
+                  <input type="text" value={editingStudent.aadhar_no || ''} onChange={(e) => setEditingStudent({ ...editingStudent, aadhar_no: e.target.value })} className="w-full px-2 py-1.5 border rounded font-mono" />
+                </div>
+                <div>
+                  <label className="font-bold">Study Center</label>
+                  <input type="text" value={editingStudent.study_center} onChange={(e) => setEditingStudent({ ...editingStudent, study_center: e.target.value })} className="w-full px-2 py-1.5 border rounded" />
+                </div>
+                <div className="col-span-2 md:col-span-3">
+                  <label className="font-bold">Address</label>
+                  <input type="text" value={editingStudent.address || ''} onChange={(e) => setEditingStudent({ ...editingStudent, address: e.target.value })} className="w-full px-2 py-1.5 border rounded" />
                 </div>
               </div>
 
               <div className="flex justify-end gap-2 pt-2 border-t">
                 <button type="button" onClick={() => setEditingStudent(null)} className="px-4 py-2 bg-slate-200 text-slate-700 font-bold rounded">Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-sky-600 text-white font-bold rounded shadow">Save Changes</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 4. EDIT BRANCH MODAL */}
+      {editingBranch && (
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b pb-2">
+              <h3 className="font-bold text-slate-900 text-sm uppercase">✏️ Edit Branch Institute</h3>
+              <button onClick={() => setEditingBranch(null)} className="text-slate-400 font-bold">✕</button>
+            </div>
+
+            <form onSubmit={handleUpdateBranch} className="space-y-3 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold">Institute Code (fixed)</label>
+                  <input type="text" value={editingBranch.institute_code} disabled className="w-full px-2 py-1.5 border rounded bg-slate-100 font-mono font-bold text-slate-500" />
+                </div>
+                <div>
+                  <label className="font-bold">Institute Name</label>
+                  <input type="text" value={editingBranch.institute_name} onChange={(e) => setEditingBranch({ ...editingBranch, institute_name: e.target.value })} className="w-full px-2 py-1.5 border rounded font-bold" />
+                </div>
+                <div>
+                  <label className="font-bold">Mobile No</label>
+                  <input type="text" value={editingBranch.mobile_no} onChange={(e) => setEditingBranch({ ...editingBranch, mobile_no: e.target.value })} className="w-full px-2 py-1.5 border rounded" />
+                </div>
+                <div>
+                  <label className="font-bold">Email</label>
+                  <input type="email" value={editingBranch.email} onChange={(e) => setEditingBranch({ ...editingBranch, email: e.target.value })} className="w-full px-2 py-1.5 border rounded" />
+                </div>
+                <div>
+                  <label className="font-bold">Head Name</label>
+                  <input type="text" value={editingBranch.head_name} onChange={(e) => setEditingBranch({ ...editingBranch, head_name: e.target.value })} className="w-full px-2 py-1.5 border rounded" />
+                </div>
+                <div>
+                  <label className="font-bold">Head Qualification</label>
+                  <input type="text" value={editingBranch.head_qualification} onChange={(e) => setEditingBranch({ ...editingBranch, head_qualification: e.target.value })} className="w-full px-2 py-1.5 border rounded" />
+                </div>
+                <div>
+                  <label className="font-bold">Head Aadhar No</label>
+                  <input type="text" value={editingBranch.head_aadhar_no} onChange={(e) => setEditingBranch({ ...editingBranch, head_aadhar_no: e.target.value })} className="w-full px-2 py-1.5 border rounded font-mono" />
+                </div>
+                <div className="col-span-2">
+                  <label className="font-bold">Address</label>
+                  <input type="text" value={editingBranch.address} onChange={(e) => setEditingBranch({ ...editingBranch, address: e.target.value })} className="w-full px-2 py-1.5 border rounded" />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t">
+                <button type="button" onClick={() => setEditingBranch(null)} className="px-4 py-2 bg-slate-200 text-slate-700 font-bold rounded">Cancel</button>
                 <button type="submit" className="px-4 py-2 bg-sky-600 text-white font-bold rounded shadow">Save Changes</button>
               </div>
             </form>

@@ -2,6 +2,11 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
+
+// Fixed Main Admin credentials (only one admin account exists)
+const MAIN_ADMIN_USERNAME = 'ADMIN';
+const MAIN_ADMIN_PASSWORD = 'Manavta#987';
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -12,42 +17,65 @@ export default function AdminLoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
 
+    const trimmedCode = instituteCode.trim();
+    const trimmedPassword = password.trim();
+
+    if (!trimmedCode || !trimmedPassword) {
+      setError('Please enter both Institute Code and Password.');
+      return;
+    }
+
+    setLoading(true);
+
     try {
-      const res = await fetch('/api/admin/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ instituteCode, password }),
-      });
-
-      const data = await res.json();
-
-      if (res.ok && data.success) {
-        localStorage.setItem('admin_session', JSON.stringify(data.institute));
+      // 1) Check Main Admin (hardcoded, single account)
+      if (trimmedCode.toUpperCase() === MAIN_ADMIN_USERNAME && trimmedPassword === MAIN_ADMIN_PASSWORD) {
+        localStorage.setItem(
+          'admin_session',
+          JSON.stringify({ institute_code: 'ADMIN', institute_name: 'Main Admin' })
+        );
+        localStorage.removeItem('branch_session');
         router.push('/admin/dashboard');
-      } else {
-        // Fallback for demo admin credentials if API fails or env fallback
-        const adminUser = process.env.NEXT_PUBLIC_ADMIN_USER || 'admin';
-        const adminPass = process.env.NEXT_PUBLIC_ADMIN_PASS || 'manavta@2026';
-
-        if (instituteCode === adminUser && password === adminPass) {
-          localStorage.setItem('admin_session', JSON.stringify({ institute_code: 'ADMIN', institute_name: 'Main Admin' }));
-          router.push('/admin/dashboard');
-        } else {
-          setError(data.message || 'Invalid Institute Code or Password. Please try again.');
-        }
+        return;
       }
+
+      // 2) Check Branch login against `branches` table
+      // Branches log in with their Institute Code (or email) + the password set at registration.
+      const { data: branchMatches, error: fetchError } = await supabase
+        .from('branches')
+        .select('*')
+        .or(`institute_code.eq.${trimmedCode.toUpperCase()},email.eq.${trimmedCode}`);
+
+      if (fetchError) {
+        console.error('Branch login lookup error:', fetchError);
+        setError('Connection error. Please check your network and try again.');
+        setLoading(false);
+        return;
+      }
+
+      const matchedBranch = (branchMatches || []).find((b: any) => b.password === trimmedPassword);
+
+      if (matchedBranch) {
+        localStorage.setItem(
+          'branch_session',
+          JSON.stringify({
+            branch_code: matchedBranch.institute_code,
+            branch_name: matchedBranch.institute_name,
+            username: trimmedCode
+          })
+        );
+        localStorage.removeItem('admin_session');
+        router.push('/branch/dashboard');
+        return;
+      }
+
+      // 3) Nothing matched
+      setError('Invalid Institute Code or Password. Please try again.');
     } catch (err) {
       console.error('Login error:', err);
-      // Hardcoded fallback if offline/error
-      if (instituteCode === 'MITM' && password === 'admin123') {
-        localStorage.setItem('admin_session', JSON.stringify({ institute_code: 'MITM', institute_name: 'Manavta Head Campus' }));
-        router.push('/admin/dashboard');
-      } else {
-        setError('Connection error. Please check your network and try again.');
-      }
+      setError('Connection error. Please check your network and try again.');
     } finally {
       setLoading(false);
     }
@@ -80,7 +108,7 @@ export default function AdminLoginPage() {
               type="text"
               value={instituteCode}
               onChange={(e) => setInstituteCode(e.target.value)}
-              placeholder="e.g. MITM"
+              placeholder="e.g. ADMIN or MITM-BILARI"
               className="w-full px-4 py-2.5 border text-slate-600 border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
               required
             />

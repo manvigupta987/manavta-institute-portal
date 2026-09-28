@@ -11,16 +11,20 @@ interface BranchStudent {
   id?: string;
   branch_code: string;
   branch_name: string;
+  serial_no?: string;
   student_name: string;
   father_name: string;
   mother_name?: string;
   course_name: string;
   admission_date: string;
+  session?: string;
   dob?: string;
+  qualification?: string;
   mobile_no?: string;
-  aadhar_no: string; // Mandatory & Strict Unique
+  alt_mobile_no?: string;
+  aadhar_no: string; // Mandatory & Strict Unique (per course)
   photo_url?: string;
-  gender?: string;
+  address?: string;
   enrollment_no: string; // "NOT_ISSUED" (display only) until admin assigns real one
   roll_no: string;       // "NOT_ISSUED" (display only) until admin assigns real one
   status: 'PENDING_APPROVAL' | 'APPROVED';
@@ -43,25 +47,29 @@ export default function BranchDashboardPage() {
       try {
         setBranchSession(JSON.parse(sessionStr));
       } catch (e) {
-        setBranchSession({ branch_code: 'MITM-CH01', branch_name: 'MITM Chandausi Branch', username: 'chandausi_admin' });
+        router.push('/login');
       }
     } else {
-      setBranchSession({ branch_code: 'MITM-CH01', branch_name: 'MITM Chandausi Branch', username: 'chandausi_admin' });
+      router.push('/login');
     }
   }, []);
 
-  // Form State (NO Roll No or Enrollment No fields allowed for Branch)
+  // Form State (NO Roll No or Enrollment No fields allowed for Branch - Main Admin assigns those)
   const [formData, setFormData] = useState({
+    serial_no: '',
     student_name: '',
     father_name: '',
     mother_name: '',
     course_name: 'Computerised Professional Accounting Course',
     admission_date: new Date().toISOString().split('T')[0],
+    session: '2025-2027',
     dob: '',
+    qualification: '',
     mobile_no: '',
+    alt_mobile_no: '',
     aadhar_no: '',
-    photo_url: '',
-    gender: 'Male'
+    photo_url: 'https://iili.io/3jruEzl.md.jpg',
+    address: ''
   });
 
   // Branch Records - now loaded from Supabase (students table), not hardcoded
@@ -79,16 +87,20 @@ export default function BranchDashboardPage() {
     id: s.id,
     branch_code: s.branch_code,
     branch_name: branchName,
+    serial_no: s.serial_no || '',
     student_name: s.student_name,
     father_name: s.father_name,
     mother_name: s.mother_name || '',
     course_name: s.course_name,
     admission_date: s.admission_date,
+    session: s.session || '',
     dob: s.dob || '',
+    qualification: s.qualification || '',
     mobile_no: s.mobile_no || '',
+    alt_mobile_no: s.alt_mobile_no || '',
     aadhar_no: s.aadhar_no || '',
     photo_url: s.photo_url || 'https://iili.io/3jruEzl.md.jpg',
-    gender: s.gender || '',
+    address: s.address || '',
     enrollment_no: s.enrollment_no && s.enrollment_no.startsWith('PENDING-') ? 'NOT_ISSUED' : s.enrollment_no,
     roll_no: s.roll_no ? s.roll_no : 'NOT_ISSUED',
     status: s.status === 'APPROVED' ? 'APPROVED' : 'PENDING_APPROVAL',
@@ -130,13 +142,28 @@ export default function BranchDashboardPage() {
     e.preventDefault();
     setFormStatus(null);
 
-    const cleanAadhar = formData.aadhar_no.trim();
-
-    if (!cleanAadhar) {
-      setFormStatus({ type: 'error', msg: 'Aadhar Number is strictly required for admission!' });
+    if (!formData.serial_no || !formData.student_name || !formData.father_name || !formData.mother_name ||
+      !formData.dob || !formData.qualification || !formData.mobile_no || !formData.aadhar_no || !formData.address) {
+      setFormStatus({ type: 'error', msg: '❌ All fields are compulsory EXCEPT Alt Mobile No!' });
       return;
     }
 
+    if (formData.mobile_no.replace(/\D/g, '').length !== 10) {
+      setFormStatus({ type: 'error', msg: '❌ Mobile No must be exactly 10 digits!' });
+      return;
+    }
+
+    if (formData.alt_mobile_no && formData.alt_mobile_no.replace(/\D/g, '').length !== 10) {
+      setFormStatus({ type: 'error', msg: '❌ Alt Mobile No must be exactly 10 digits!' });
+      return;
+    }
+
+    if (formData.aadhar_no.replace(/\D/g, '').length !== 12) {
+      setFormStatus({ type: 'error', msg: '❌ Aadhar No must be exactly 12 digits!' });
+      return;
+    }
+
+    const cleanAadhar = formData.aadhar_no.trim();
     const digitsOnly = cleanAadhar.replace(/\D/g, '');
     const selectedCourse = formData.course_name.trim();
 
@@ -173,15 +200,20 @@ export default function BranchDashboardPage() {
     const payload = {
       enrollment_no: placeholderEnrollment,
       roll_no: null,
+      serial_no: formData.serial_no.trim(),
       student_name: formData.student_name.trim().toUpperCase(),
       father_name: formData.father_name.trim().toUpperCase(),
-      mother_name: formData.mother_name.trim().toUpperCase() || null,
+      mother_name: formData.mother_name.trim().toUpperCase(),
       course_name: formData.course_name.trim(),
       admission_date: formData.admission_date,
-      dob: formData.dob || null,
-      mobile_no: formData.mobile_no.trim() || null,
+      session: formData.session.trim(),
+      dob: formData.dob,
+      qualification: formData.qualification.trim(),
+      mobile_no: formData.mobile_no.trim(),
+      alt_mobile_no: formData.alt_mobile_no.trim() || null,
       aadhar_no: cleanAadhar,
-      photo_url: formData.photo_url.trim() || 'https://iili.io/3jruEzl.md.jpg',
+      photo_url: formData.photo_url || 'https://iili.io/3jruEzl.md.jpg',
+      address: formData.address.trim(),
       status: 'PENDING_APPROVAL',
       branch_code: branchSession?.branch_code || 'BRANCH',
       study_center: branchSession?.branch_name || 'MITM',
@@ -208,138 +240,54 @@ export default function BranchDashboardPage() {
 
     // Reset Form
     setFormData({
+      serial_no: '',
       student_name: '',
       father_name: '',
       mother_name: '',
       course_name: 'Computerised Professional Accounting Course',
       admission_date: new Date().toISOString().split('T')[0],
+      session: '2025-2027',
       dob: '',
+      qualification: '',
       mobile_no: '',
+      alt_mobile_no: '',
       aadhar_no: '',
-      photo_url: '',
-      gender: 'Male'
+      photo_url: 'https://iili.io/3jruEzl.md.jpg',
+      address: ''
     });
   };
 
   // -------------------------------------------------------------------------
-  // 2. BULK CSV / EXCEL UPLOAD WITH STRICT AADHAR CHECK (DB-backed)
+  // PHOTO UPLOAD VALIDATION HANDLER (JPG/PNG <= 200KB) - same rule as Admin form
   // -------------------------------------------------------------------------
-  const handleCSVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    onSuccess: (base64Url: string) => void
+  ) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+    if (!validTypes.includes(file.type)) {
+      setFormStatus({ type: 'error', msg: '❌ Photo must be in JPG or PNG format only!' });
+      e.target.value = '';
+      return;
+    }
+
+    const maxSizeBytes = 200 * 1024;
+    if (file.size > maxSizeBytes) {
+      setFormStatus({ type: 'error', msg: `❌ Photo size exceeds 200KB limit! (Selected file size: ${(file.size / 1024).toFixed(1)}KB)` });
+      e.target.value = '';
+      return;
+    }
+
     const reader = new FileReader();
-    reader.onload = async (evt) => {
-      try {
-        const text = evt.target?.result as string;
-        const lines = text.split(/\r?\n/).filter((l) => l.trim() !== '');
-
-        if (lines.length <= 1) {
-          setFormStatus({ type: 'error', msg: 'CSV file is empty or missing headers.' });
-          return;
-        }
-
-        // Pull every existing Aadhar+Course combo from the DB once, to check duplicates against
-        const { data: existingRows, error: fetchErr } = await supabase
-          .from('students')
-          .select('aadhar_no, course_name')
-          .not('aadhar_no', 'is', null);
-
-        if (fetchErr) {
-          setFormStatus({ type: 'error', msg: '❌ Could not verify existing records: ' + fetchErr.message });
-          return;
-        }
-
-        // Key = digitsOnlyAadhar + "::" + lowercased course name
-        const existingCombos = new Set(
-          (existingRows || []).map(
-            (r: any) => `${(r.aadhar_no || '').replace(/\D/g, '')}::${(r.course_name || '').trim().toLowerCase()}`
-          )
-        );
-
-        const rowsToInsert: any[] = [];
-        let duplicateCount = 0;
-
-        for (let i = 1; i < lines.length; i++) {
-          const cols = lines[i].split(',').map((c) => c.trim().replace(/^"|"$/g, ''));
-          if (cols.length >= 4) {
-            const aadhar = cols[5] || '';
-            const cleanA = aadhar.replace(/\D/g, '');
-            const rowCourse = cols[3] || 'Professional Course';
-            const combo = `${cleanA}::${rowCourse.trim().toLowerCase()}`;
-
-            if (cleanA && existingCombos.has(combo)) {
-              duplicateCount++;
-              continue; // Skip duplicate Aadhar+Course combination
-            }
-            if (cleanA) existingCombos.add(combo);
-
-            rowsToInsert.push({
-              enrollment_no: `PENDING-${Date.now()}-${i}-${Math.floor(Math.random() * 10000)}`,
-              roll_no: null,
-              student_name: (cols[0] || 'STUDENT').toUpperCase(),
-              father_name: (cols[1] || '').toUpperCase(),
-              mother_name: (cols[2] || '').toUpperCase() || null,
-              course_name: cols[3] || 'Professional Course',
-              admission_date: cols[4] || new Date().toISOString().split('T')[0],
-              aadhar_no: aadhar || null,
-              mobile_no: cols[6] || null,
-              dob: cols[7] || null,
-              photo_url: cols[8] || 'https://iili.io/3jruEzl.md.jpg',
-              status: 'PENDING_APPROVAL',
-              branch_code: branchSession?.branch_code || 'BRANCH',
-              study_center: branchSession?.branch_name || 'MITM',
-            });
-          }
-        }
-
-        if (rowsToInsert.length > 0) {
-          const { data: inserted, error: insertErr } = await supabase
-            .from('students')
-            .insert(rowsToInsert)
-            .select();
-
-          if (insertErr) {
-            console.error('Bulk insert error:', insertErr);
-            setFormStatus({ type: 'error', msg: '❌ Bulk upload failed: ' + insertErr.message });
-            return;
-          }
-
-          const mapped = (inserted || []).map((row: any) =>
-            mapRowToBranchStudent(row, branchSession?.branch_name || 'Branch Office')
-          );
-
-          setStudentList([...mapped, ...studentList]);
-          setFormStatus({
-            type: 'success',
-            msg: `✅ Successfully imported ${mapped.length} student records! ${
-              duplicateCount > 0 ? `(Skipped ${duplicateCount} duplicate Aadhar+Course records)` : ''
-            }`
-          });
-        } else if (duplicateCount > 0) {
-          setFormStatus({
-            type: 'error',
-            msg: `❌ All ${duplicateCount} records in the CSV were skipped — same Aadhar is already admitted in the same course!`
-          });
-        }
-      } catch (err) {
-        console.error(err);
-        setFormStatus({ type: 'error', msg: 'Failed to parse CSV file. Please check format.' });
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        onSuccess(event.target.result as string);
       }
     };
-    reader.readAsText(file);
-  };
-
-  const downloadSampleCSV = () => {
-    const csvContent =
-      'data:text/csv;charset=utf-8,Student_Name,Father_Name,Mother_Name,Course_Name,Admission_Date,Aadhar_No,Mobile_No,DOB,Photo_URL\nAMIT KUMAR,RAMESH KUMAR,SUNITA DEVI,Computerised Professional Accounting Course,01.08.2025,9988-7766-5544,9876543210,15.08.2005,https://iili.io/3jruEzl.md.jpg';
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', 'Branch_Student_Admission_Sample.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    reader.readAsDataURL(file);
   };
 
   const handlePrintTable = () => {
@@ -451,18 +399,32 @@ export default function BranchDashboardPage() {
           </div>
 
           <form onSubmit={handleFormSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Document No *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. DN-3765"
+                  value={formData.serial_no}
+                  onChange={(e) => setFormData({ ...formData, serial_no: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-bold uppercase focus:ring-2 focus:ring-sky-500"
+                />
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
                   Candidate Name *
                 </label>
                 <input
                   type="text"
+                  required
                   value={formData.student_name}
                   onChange={(e) => setFormData({ ...formData, student_name: e.target.value })}
                   placeholder="e.g. SHREYA CHUG"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-sky-500 font-semibold"
-                  required
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-sky-500 font-semibold uppercase"
                 />
               </div>
 
@@ -472,44 +434,31 @@ export default function BranchDashboardPage() {
                 </label>
                 <input
                   type="text"
+                  required
                   value={formData.father_name}
                   onChange={(e) => setFormData({ ...formData, father_name: e.target.value })}
                   placeholder="e.g. YOGESH CHUG"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-sky-500 font-semibold"
-                  required
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-sky-500 font-semibold uppercase"
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                  Mother&apos;s Name
+                  Mother&apos;s Name *
                 </label>
                 <input
                   type="text"
+                  required
                   value={formData.mother_name}
                   onChange={(e) => setFormData({ ...formData, mother_name: e.target.value })}
                   placeholder="e.g. SUNITA DEVI"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-sky-500"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-sky-500 font-semibold uppercase"
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                  Aadhar Number (Mandatory & Unique) *
-                </label>
-                <input
-                  type="text"
-                  value={formData.aadhar_no}
-                  onChange={(e) => setFormData({ ...formData, aadhar_no: e.target.value })}
-                  placeholder="e.g. 1234-5678-9012"
-                  className="w-full px-3 py-2 border-2 border-amber-300 bg-amber-50/50 rounded-lg text-xs focus:ring-2 focus:ring-amber-500 font-bold"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                  Course Name *
+                  Course *
                 </label>
                 <select
                   value={formData.course_name}
@@ -532,48 +481,121 @@ export default function BranchDashboardPage() {
                 </label>
                 <input
                   type="date"
+                  required
                   value={formData.admission_date}
                   onChange={(e) => setFormData({ ...formData, admission_date: e.target.value })}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-sky-500"
-                  required
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                  Date of Birth (DOB)
+                  Session (e.g. 2025-2027) *
                 </label>
                 <input
                   type="text"
+                  required
+                  placeholder="2025-2027"
+                  value={formData.session}
+                  onChange={(e) => setFormData({ ...formData, session: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-sky-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  DOB *
+                </label>
+                <input
+                  type="date"
+                  required
                   value={formData.dob}
                   onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
-                  placeholder="e.g. 15.08.2005"
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-sky-500"
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                  Mobile Number
+                  Qualification *
                 </label>
                 <input
                   type="text"
+                  required
+                  placeholder="e.g. 12th Pass, Graduate"
+                  value={formData.qualification}
+                  onChange={(e) => setFormData({ ...formData, qualification: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-sky-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Mobile No (10 Digits) *
+                </label>
+                <input
+                  type="text"
+                  required
+                  maxLength={10}
+                  placeholder="10 digit mobile"
                   value={formData.mobile_no}
                   onChange={(e) => setFormData({ ...formData, mobile_no: e.target.value })}
-                  placeholder="e.g. 9876543210"
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-sky-500"
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                  Photo Link / URL
+                  Alt Mobile No (Optional)
                 </label>
                 <input
                   type="text"
-                  value={formData.photo_url}
-                  onChange={(e) => setFormData({ ...formData, photo_url: e.target.value })}
-                  placeholder="Paste image URL (Optional)"
+                  maxLength={10}
+                  placeholder="10 digit optional"
+                  value={formData.alt_mobile_no}
+                  onChange={(e) => setFormData({ ...formData, alt_mobile_no: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-sky-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Aadhar No (12 Digits) *
+                </label>
+                <input
+                  type="text"
+                  required
+                  maxLength={12}
+                  placeholder="12 digit Aadhar"
+                  value={formData.aadhar_no}
+                  onChange={(e) => setFormData({ ...formData, aadhar_no: e.target.value })}
+                  className="w-full px-3 py-2 border-2 border-amber-300 bg-amber-50/50 rounded-lg text-xs font-mono font-bold focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Upload Photo (JPG/PNG &lt;= 200KB) *
+                </label>
+                <input
+                  type="file"
+                  required
+                  accept="image/jpeg,image/jpg,image/png"
+                  onChange={(e) => handlePhotoUpload(e, (url) => setFormData({ ...formData, photo_url: url }))}
+                  className="w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100"
+                />
+              </div>
+
+              <div className="sm:col-span-2 md:col-span-3 lg:col-span-4">
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Full Address *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Complete residential address"
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-sky-500"
                 />
               </div>
@@ -591,36 +613,7 @@ export default function BranchDashboardPage() {
         </div>
 
         {/* ========================================================================= */}
-        {/* 2. BULK CSV UPLOAD FOR BRANCH */}
-        {/* ========================================================================= */}
-        <div className="bg-white p-6 rounded-2xl shadow-md border border-slate-200 space-y-4 no-print">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b pb-4">
-            <div>
-              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide flex items-center gap-2">
-                <span>📁</span> Bulk Upload Admission Records via CSV
-              </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Upload CSV file for batch admission. System will automatically reject duplicate Aadhar numbers.
-              </p>
-            </div>
-            <button
-              onClick={downloadSampleCSV}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-lg shadow transition cursor-pointer flex items-center gap-1.5"
-            >
-              <span>📥</span> Download Branch CSV Template
-            </button>
-          </div>
-
-          <input
-            type="file"
-            accept=".csv"
-            onChange={handleCSVUpload}
-            className="block w-full text-xs text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-amber-500 file:text-slate-900 hover:file:bg-amber-600 cursor-pointer"
-          />
-        </div>
-
-        {/* ========================================================================= */}
-        {/* 3. SUBMITTED BRANCH STUDENTS TABLE */}
+        {/* 2. SUBMITTED BRANCH STUDENTS TABLE */}
         {/* ========================================================================= */}
         <div id="branch-table-container" className="bg-white p-6 sm:p-8 rounded-2xl shadow-md border border-slate-200 space-y-4">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 no-print">
