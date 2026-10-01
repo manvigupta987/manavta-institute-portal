@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css"; 
 import Navbar from "../components/navbar";
-
+import WebsiteFooter from "../components/footer";
 // Google font configuration (website ke text ko premium look dene ke liye) 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -31,7 +31,7 @@ export default function RootLayout({
         {children}
         </main>
         
-        
+        <WebsiteFooter /> {/* Footer ko website ke har page par upar hi rahega */}
       </body>
     </html>
   );

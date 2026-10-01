@@ -713,7 +713,7 @@ body {
   align-items: center;
   border-bottom: 1.5px solid #0284c7;
   padding-bottom: 1.5mm;
-  margin-bottom: 1.5mm;
+  margin-bottom: 3.5mm;
 }
 .header-logos img {
   height: 6mm;
@@ -724,9 +724,10 @@ body {
 }
 .card-body {
   display: flex;
-  gap: 2.5mm;
+  gap: 3.5mm;
   align-items: flex-start;
   flex: 1;
+  margin-top:5mm;
 }
 .photo-box {
   width: 13.5mm;
@@ -780,9 +781,9 @@ body {
 <div class="id-card-box">
   <div>
     <div class="header-logos">
-      <img src="/mitm-logo.png" alt="MITM Logo" onError="this.src='https://iili.io/3jruEzl.md.jpg'" />
-      <img src="/manavta-text-logo.png" class="logo-center" alt="MANAVTA Text Logo" onError="this.style.display='none'" />
-      <img src="/iso-certified-badge.png" alt="ISO Badge" onError="this.src='https://iili.io/3jruEzl.md.jpg'" />
+      <img src="/logo.png" alt="MITM Logo" />
+      <img src="/logo2.png" class="logo-center" alt="MANAVTA Text Logo" onError="this.style.display='none'" />
+      <img src="/site.jpg" alt="ISO Badge" />
     </div>
 
     <div class="card-body">
@@ -1818,9 +1819,9 @@ window.onload = function() {
             {/* ID CARD CONTAINER WITH LANDSCAPE AADHAR SIZE & 3 LOGOS */}
             <div className="p-3 bg-white rounded-xl border-2 border-slate-900 space-y-2 shadow-sm mx-auto" style={{ width: '320px', height: '200px' }}>
               <div className="flex items-center justify-between border-b-2 border-sky-600 pb-1.5">
-                <img src="/mitm-logo.png" alt="Logo 1" className="h-6 object-contain" onError={(e: any) => e.target.src='https://iili.io/3jruEzl.md.jpg'} />
-                <img src="/manavta-text-logo.png" alt="MANAVTA Text" className="h-5 object-contain" onError={(e: any) => e.target.style.display='none'} />
-                <img src="/iso-certified-badge.png" alt="Logo 3" className="h-6 object-contain" onError={(e: any) => e.target.src='https://iili.io/3jruEzl.md.jpg'} />
+                <img src="/logo.png" alt="Logo 1" className="h-6 object-contain" onError={(e: any) => e.target.src='https://iili.io/3jruEzl.md.jpg'} />
+                <img src="/logo2.png" alt="MANAVTA Text" className="h-5 object-contain" onError={(e: any) => e.target.style.display='none'} />
+                <img src="/site.jpg" alt="Logo 3" className="h-6 object-contain" onError={(e: any) => e.target.src='https://iili.io/3jruEzl.md.jpg'} />
               </div>
 
               <div className="flex items-start gap-2.5 pt-1">

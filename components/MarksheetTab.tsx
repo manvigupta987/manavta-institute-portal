@@ -934,11 +934,14 @@ export default function MarksheetTabComponent({ studentsList = [] }: MarksheetTa
                 <div className="text-center">
                   <img src={buildQrUrl(viewingMarksheet, 120)} alt="QR" className="w-16 h-16 mx-auto mb-1 border border-black p-1 bg-white" />
                   <div className="text-[8px] font-black uppercase">SCAN TO VERIFY</div>
+                  <div className="text-[10px] font-bold mb-4 mt-2">DATE: {formatDate(viewingMarksheet.issue_date)}</div>
                 </div>
 
                 <div className="text-center w-36">
-                  <div className="text-[10px] font-bold mb-4">DATE: {formatDate(viewingMarksheet.issue_date)}</div>
+                  
                   <div className="border-t border-black pt-1 text-[9px] font-bold uppercase">CHIEF EXAM CONTROLLER</div>
+
+                  
                 </div>
               </div>
             </div>

@@ -228,7 +228,6 @@ export default function HomePage() {
           <h1 className='font-bold text-3xl md:text-4xl text-black'>We are Acrredidated In ✅</h1></div>
         <InfiniteMarquee />
       </div>
-
-    </main>
+  </main>
   );
 }

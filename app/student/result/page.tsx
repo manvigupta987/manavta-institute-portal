@@ -1,70 +1,119 @@
 "use client";
 
 // Save as: app/student/result/page.tsx
+//
+// IMPORTANT: Students can ONLY ever see Pass/Fail + Grade here.
+// This page never fetches or shows subject-wise marks (marksheet) or the
+// certificate - those stay strictly inside the Admin Dashboard.
 import React, { useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { printMarksheet, formatDate } from '@/lib/print-templates';
+import { printResultCard } from '@/lib/print-templates';
 
 const PLACEHOLDER_PHOTO = 'https://iili.io/3jruEzl.md.jpg';
 
+interface StudentHit {
+  id: string;
+  roll_no: string;
+  enrollment_no: string;
+  student_name: string;
+  father_name: string;
+  course_name: string;
+  study_center: string;
+  photo_url?: string;
+}
+
+interface ResultView {
+  roll_no: string;
+  enrollment_no: string;
+  student_name: string;
+  father_name: string;
+  course_name: string;
+  study_center: string;
+  photo_url?: string;
+  percentage: number;
+  grade: string;
+  result: 'PASS' | 'FAIL';
+}
+
+// Only the columns needed -> fast query, no heavy/sensitive data
+const STUDENT_COLS = 'id,roll_no,enrollment_no,student_name,father_name,course_name,study_center,photo_url';
+// Only percentage + grade from marksheets - subjects jsonb is never requested here
+const MARKSHEET_COLS = 'roll_no,percentage,grade';
+
 export default function CheckResultPage() {
-  const [rollNo, setRollNo] = useState('');
-  const [dob, setDob] = useState('');
+  const [nameInput, setNameInput] = useState('');
+  const [rollInput, setRollInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
   const [errorMsg, setErrorMsg] = useState('');
+  const [searched, setSearched] = useState(false);
+
+  const [matches, setMatches] = useState<StudentHit[]>([]);
+  const [result, setResult] = useState<ResultView | null>(null);
+
+  const loadResultFor = async (student: StudentHit) => {
+    const { data: msRows, error: msErr } = await supabase
+      .from('marksheets')
+      .select(MARKSHEET_COLS)
+      .eq('roll_no', student.roll_no)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (msErr) {
+      setErrorMsg('Error connecting to database. Please try again.');
+      return;
+    }
+
+    if (!msRows || msRows.length === 0) {
+      setErrorMsg(`Result has not been declared yet for ${student.student_name}.`);
+      return;
+    }
+
+    const grade = String(msRows[0].grade || '').toUpperCase();
+    setResult({
+      roll_no: student.roll_no,
+      enrollment_no: student.enrollment_no,
+      student_name: student.student_name,
+      father_name: student.father_name,
+      course_name: student.course_name,
+      study_center: student.study_center,
+      photo_url: student.photo_url,
+      percentage: Number(msRows[0].percentage) || 0,
+      grade,
+      result: grade === 'F' ? 'FAIL' : 'PASS',
+    });
+  };
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMsg('');
-    setResult(null);
+    const name = nameInput.trim();
+    const roll = rollInput.trim();
 
-    const roll = rollNo.trim();
-    if (!roll || !dob) {
-      setErrorMsg('Please enter both Roll Number and Date of Birth.');
+    if (!name && !roll) {
+      setErrorMsg('Please enter Student Name or Roll Number.');
       return;
     }
 
     setLoading(true);
+    setErrorMsg('');
+    setMatches([]);
+    setResult(null);
+    setSearched(true);
 
     try {
-      // 1) Verify identity: Roll No + DOB must match an approved student (indexed lookup)
-      const { data: stu, error: stuErr } = await supabase
-        .from('students')
-        .select('id')
-        .eq('roll_no', roll)
-        .eq('dob', dob)
-        .eq('status', 'APPROVED')
-        .limit(1);
+      let query = supabase.from('students').select(STUDENT_COLS).eq('status', 'APPROVED');
+      if (roll) query = query.eq('roll_no', roll);
+      if (name) query = query.ilike('student_name', `%${name}%`);
 
-      if (stuErr) throw stuErr;
-      if (!stu || stu.length === 0) {
-        setErrorMsg('No student found with this Roll Number and Date of Birth.');
-        return;
+      const { data, error } = await query.limit(20);
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        setErrorMsg('No matching student found. Please check Name / Roll Number.');
+      } else if (data.length === 1) {
+        await loadResultFor(data[0] as StudentHit);
+      } else {
+        setMatches(data as StudentHit[]);
       }
-
-      // 2) Fetch the marksheet
-      const { data: ms, error: msErr } = await supabase
-        .from('marksheets')
-        .select('*')
-        .eq('roll_no', roll)
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      if (msErr) throw msErr;
-      if (!ms || ms.length === 0) {
-        setErrorMsg('Result has not been declared yet for this Roll Number.');
-        return;
-      }
-
-      const r = ms[0];
-      setResult({
-        ...r,
-        subjects: Array.isArray(r.subjects) ? r.subjects : [],
-        grand_total_obtained: Number(r.grand_total_obtained) || 0,
-        grand_total_max: Number(r.grand_total_max) || 0,
-        percentage: Number(r.percentage) || 0,
-      });
     } catch (err) {
       console.error(err);
       setErrorMsg('Error connecting to database. Please try again.');
@@ -73,113 +122,152 @@ export default function CheckResultPage() {
     }
   };
 
+  const handlePickMatch = async (m: StudentHit) => {
+    setMatches([]);
+    setLoading(true);
+    await loadResultFor(m);
+    setLoading(false);
+  };
+
+  const handlePrint = () => {
+    if (!result) return;
+    printResultCard(result);
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 py-10 px-4 font-sans flex flex-col items-center">
-      <div className="w-full max-w-3xl space-y-6">
+      <div className="w-full max-w-2xl space-y-6">
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 text-center space-y-2">
           <h1 className="text-xl sm:text-2xl font-black uppercase tracking-wide">📊 Check Your Result</h1>
-          <p className="text-xs text-slate-500">Enter your Roll Number and Date of Birth to view your statement of marks.</p>
+          <p className="text-xs text-slate-500">
+            Enter Student Name (full or partial) or Roll Number to view your result.
+          </p>
         </div>
 
         <form onSubmit={handleSearch} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
             <div>
-              <label className="block font-bold text-slate-700 uppercase mb-1">Roll Number</label>
+              <label className="block font-bold text-slate-700 uppercase mb-1">
+                Student Name <span className="text-[10px] text-slate-400">(optional, e.g. manvi)</span>
+              </label>
               <input
                 type="text"
-                value={rollNo}
-                onChange={(e) => setRollNo(e.target.value)}
-                placeholder="e.g. 103766"
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 font-mono font-bold"
-                required
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                placeholder="Enter Student Name"
+                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 font-medium"
               />
             </div>
             <div>
-              <label className="block font-bold text-slate-700 uppercase mb-1">Date of Birth</label>
+              <label className="block font-bold text-slate-700 uppercase mb-1">
+                Roll Number <span className="text-[10px] text-slate-400">(optional)</span>
+              </label>
               <input
-                type="date"
-                value={dob}
-                onChange={(e) => setDob(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 font-medium"
-                required
+                type="text"
+                value={rollInput}
+                onChange={(e) => setRollInput(e.target.value)}
+                placeholder="e.g. 103766"
+                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 font-mono font-medium"
               />
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
+          <div className="flex justify-end pt-2 border-t border-slate-100">
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-2 bg-sky-600 hover:bg-sky-700 disabled:bg-slate-400 text-white font-bold text-xs rounded-xl transition shadow cursor-pointer"
+              className="w-full sm:w-auto px-6 py-2 bg-sky-600 hover:bg-sky-700 disabled:bg-slate-400 text-white font-bold text-xs rounded-xl transition shadow cursor-pointer"
             >
               {loading ? '🔍 Searching...' : '🔍 View Result'}
             </button>
           </div>
         </form>
 
-        {errorMsg && (
+        {errorMsg && searched && (
           <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-xl text-xs font-bold text-center shadow-sm">
             ❌ {errorMsg}
           </div>
         )}
 
+        {matches.length > 0 && (
+          <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-2">
+            <p className="text-xs font-bold text-slate-700 uppercase">
+              {matches.length} matching records found — select yours:
+            </p>
+            <div className="divide-y divide-slate-100">
+              {matches.map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => handlePickMatch(m)}
+                  className="w-full flex items-center justify-between py-2.5 text-left hover:bg-slate-50 px-2 rounded-lg transition"
+                >
+                  <div>
+                    <div className="text-sm font-bold uppercase">{m.student_name}</div>
+                    <div className="text-[11px] text-slate-500">
+                      Roll: <span className="font-mono font-bold">{m.roll_no}</span> • {m.course_name}
+                    </div>
+                  </div>
+                  <span className="text-sky-600 text-xs font-bold">View Result →</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Result card - Pass/Fail + Grade ONLY. No subject marks, no certificate. */}
         {result && (
-          <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-md border border-slate-200 space-y-5 text-black text-xs">
+          <div className="bg-white p-6 rounded-2xl shadow-md border border-slate-200 space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
-              <span className="font-bold uppercase tracking-wide">Statement of Marks</span>
-              <button
-                onClick={() => printMarksheet(result, { topMarginMm: 15, showHeader: true })}
-                className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow transition cursor-pointer"
+              <span className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                <span>📊</span> Result Summary
+              </span>
+              <span
+                className={`text-[11px] font-black uppercase px-2.5 py-1 rounded-md border ${
+                  result.result === 'PASS'
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : 'bg-rose-50 text-rose-700 border-rose-200'
+                }`}
               >
-                🖨️ Print / Download
-              </button>
+                {result.result}
+              </span>
             </div>
 
-            <div className="flex justify-between items-start gap-4 border-2 border-black p-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 flex-1">
-                <div><span className="font-extrabold">PROGRAMME:</span> <span className="font-bold">{result.course_name}</span></div>
-                <div><span className="font-extrabold">SESSION:</span> <span className="font-bold">{result.session}</span></div>
-                <div><span className="font-extrabold">ROLL NO:</span> <span className="font-black">{result.roll_no}</span></div>
-                <div><span className="font-extrabold">ENROLLMENT NO:</span> <span className="font-black">{result.enrollment_no}</span></div>
-                <div><span className="font-extrabold">CANDIDATE:</span> <span className="font-extrabold uppercase">{result.student_name}</span></div>
-                <div><span className="font-extrabold">FATHER:</span> <span className="font-bold uppercase">{result.father_name}</span></div>
-                <div><span className="font-extrabold">DOB:</span> <span className="font-bold">{formatDate(result.dob) || 'N/A'}</span></div>
-                <div><span className="font-extrabold">STUDY CENTER:</span> <span className="font-bold">{result.study_center}</span></div>
+            <div className="flex justify-center py-4 bg-slate-100 rounded-xl border border-slate-200">
+              <div className="w-full max-w-md bg-white border-2 border-slate-900 rounded-xl p-5 shadow-lg space-y-4">
+                <div className="flex items-center justify-between gap-3 border-b-2 border-slate-900 pb-2">
+                  <img src="/mitm-logo.png" alt="MITM" className="h-10 object-contain" onError={(e: any) => (e.target.style.display = 'none')} />
+                  <img src="/manavta-text-logo.png" alt="MANAVTA" className="h-7 object-contain flex-1" onError={(e: any) => (e.target.style.display = 'none')} />
+                  <img src="/iso-certified-badge.png" alt="ISO" className="h-9 object-contain" onError={(e: any) => (e.target.style.display = 'none')} />
+                </div>
+
+                <div className="flex items-start gap-4">
+                  <div className="space-y-1.5 text-[12px] font-semibold flex-1 min-w-0">
+                    <div><span className="font-bold">Roll No:</span> {result.roll_no}</div>
+                    <div><span className="font-bold">Enrollment No:</span> {result.enrollment_no}</div>
+                    <div><span className="font-bold">Name:</span> <span className="uppercase">{result.student_name}</span></div>
+                    <div><span className="font-bold">Fathers Name:</span> <span className="uppercase">{result.father_name}</span></div>
+                    <div><span className="font-bold">Course:</span> {result.course_name}</div>
+                    <div><span className="font-bold">Percentage:</span> {result.percentage}%</div>
+                    <div><span className="font-bold">Grade:</span> {result.grade}</div>
+                    <div><span className="font-bold">Result:</span> {result.result === 'PASS' ? 'Pass' : 'Fail'}</div>
+                    <div><span className="font-bold">Study Center:</span> {result.study_center}</div>
+                  </div>
+                  <img
+                    src={result.photo_url || PLACEHOLDER_PHOTO}
+                    alt={result.student_name}
+                    className="w-20 h-24 border border-slate-300 rounded-md object-cover flex-shrink-0 bg-slate-50"
+                  />
+                </div>
               </div>
-              <img src={result.photo_url || PLACEHOLDER_PHOTO} alt="Student" className="w-20 h-24 object-cover border-2 border-black shrink-0" />
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse border-2 border-black text-center">
-                <thead className="font-extrabold">
-                  <tr className="border-b-2 border-black">
-                    <th className="p-2 border-r border-black">PAPER CODE</th>
-                    <th className="p-2 border-r border-black text-left">EXAM / PAPER NAME</th>
-                    <th className="p-2 border-r border-black">MAX</th>
-                    <th className="p-2 border-r border-black">THEORY</th>
-                    <th className="p-2 border-r border-black">PRACTICAL</th>
-                    <th className="p-2">TOTAL</th>
-                  </tr>
-                </thead>
-                <tbody className="font-semibold">
-                  {result.subjects.map((s: any, i: number) => (
-                    <tr key={i} className="border-b border-black">
-                      <td className="p-2 border-r border-black font-mono font-bold">{s.paper_code}</td>
-                      <td className="p-2 border-r border-black text-left uppercase">{s.paper_name}</td>
-                      <td className="p-2 border-r border-black">{s.max_marks}</td>
-                      <td className="p-2 border-r border-black">{s.theory}</td>
-                      <td className="p-2 border-r border-black">{s.practical}</td>
-                      <td className="p-2 font-bold">{s.total_marks}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="flex flex-wrap justify-between items-center gap-2 border-2 border-black p-3 font-extrabold">
-              <div>GRAND TOTAL: {result.grand_total_obtained} / {result.grand_total_max}</div>
-              <div>PERCENTAGE: {result.percentage}%</div>
-              <div>FINAL GRADE: {result.grade}</div>
+            <div className="flex justify-center pt-2">
+              <button
+                onClick={handlePrint}
+                className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow transition cursor-pointer flex items-center gap-2"
+              >
+                🖨️ Print / Download Result
+              </button>
             </div>
           </div>
         )}
