@@ -2,9 +2,9 @@
 
 // Save as: app/student/result/page.tsx
 //
-// IMPORTANT: Students can ONLY ever see Pass/Fail + Grade here.
-// This page never fetches or shows subject-wise marks (marksheet) or the
-// certificate - those stay strictly inside the Admin Dashboard.
+// IMPORTANT: Students can ONLY ever see Grade + Pass/Fail here. No percentage,
+// no subject-wise marks, no certificate access. The Marksheet and Certificate
+// stay strictly inside the Admin Dashboard.
 import React, { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { printResultCard } from '@/lib/print-templates';
@@ -30,15 +30,13 @@ interface ResultView {
   course_name: string;
   study_center: string;
   photo_url?: string;
-  percentage: number;
   grade: string;
   result: 'PASS' | 'FAIL';
 }
 
-// Only the columns needed -> fast query, no heavy/sensitive data
 const STUDENT_COLS = 'id,roll_no,enrollment_no,student_name,father_name,course_name,study_center,photo_url';
-// Only percentage + grade from marksheets - subjects jsonb is never requested here
-const MARKSHEET_COLS = 'roll_no,percentage,grade';
+const MARKSHEET_COLS = 'grade';
+const CERTIFICATE_COLS = 'grade';
 
 export default function CheckResultPage() {
   const [nameInput, setNameInput] = useState('');
@@ -55,7 +53,7 @@ export default function CheckResultPage() {
       .from('marksheets')
       .select(MARKSHEET_COLS)
       .eq('roll_no', student.roll_no)
-      .order('created_at', { ascending: false })
+      .eq('enrollment_no', student.enrollment_no)
       .limit(1);
 
     if (msErr) {
@@ -63,12 +61,33 @@ export default function CheckResultPage() {
       return;
     }
 
-    if (!msRows || msRows.length === 0) {
+    let grade: string | null = null;
+
+    if (msRows && msRows.length > 0) {
+      grade = String(msRows[0].grade || '').toUpperCase();
+    } else {
+      const { data: certRows, error: certErr } = await supabase
+        .from('certificates')
+        .select(CERTIFICATE_COLS)
+        .eq('roll_no', student.roll_no)
+        .eq('enrollment_no', student.enrollment_no)
+        .limit(1);
+
+      if (certErr) {
+        setErrorMsg('Error connecting to database. Please try again.');
+        return;
+      }
+
+      if (certRows && certRows.length > 0) {
+        grade = String(certRows[0].grade || '').toUpperCase();
+      }
+    }
+
+    if (!grade) {
       setErrorMsg(`Result has not been declared yet for ${student.student_name}.`);
       return;
     }
 
-    const grade = String(msRows[0].grade || '').toUpperCase();
     setResult({
       roll_no: student.roll_no,
       enrollment_no: student.enrollment_no,
@@ -77,7 +96,6 @@ export default function CheckResultPage() {
       course_name: student.course_name,
       study_center: student.study_center,
       photo_url: student.photo_url,
-      percentage: Number(msRows[0].percentage) || 0,
       grade,
       result: grade === 'F' ? 'FAIL' : 'PASS',
     });
@@ -88,8 +106,9 @@ export default function CheckResultPage() {
     const name = nameInput.trim();
     const roll = rollInput.trim();
 
-    if (!name && !roll) {
-      setErrorMsg('Please enter Student Name or Roll Number.');
+    // Both fields are mandatory
+    if (!name || !roll) {
+      setErrorMsg('Both Student Name and Roll Number are required.');
       return;
     }
 
@@ -100,15 +119,20 @@ export default function CheckResultPage() {
     setSearched(true);
 
     try {
-      let query = supabase.from('students').select(STUDENT_COLS).eq('status', 'APPROVED');
-      if (roll) query = query.eq('roll_no', roll);
-      if (name) query = query.ilike('student_name', `%${name}%`);
+      // Name match is "starts with" (so "manvi" or "manvi gupta" matches
+      // "MANVI GUPTA", but a surname-only search like "gupta" will not).
+      const { data, error } = await supabase
+        .from('students')
+        .select(STUDENT_COLS)
+        .eq('status', 'APPROVED')
+        .eq('roll_no', roll)
+        .ilike('student_name', `${name}%`)
+        .limit(5);
 
-      const { data, error } = await query.limit(20);
       if (error) throw error;
 
       if (!data || data.length === 0) {
-        setErrorMsg('No matching student found. Please check Name / Roll Number.');
+        setErrorMsg('No matching student found. Please check Name & Roll Number.');
       } else if (data.length === 1) {
         await loadResultFor(data[0] as StudentHit);
       } else {
@@ -140,7 +164,7 @@ export default function CheckResultPage() {
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 text-center space-y-2">
           <h1 className="text-xl sm:text-2xl font-black uppercase tracking-wide">📊 Check Your Result</h1>
           <p className="text-xs text-slate-500">
-            Enter Student Name (full or partial) or Roll Number to view your result.
+            Enter your Name and Roll Number to view your result.
           </p>
         </div>
 
@@ -148,7 +172,7 @@ export default function CheckResultPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
             <div>
               <label className="block font-bold text-slate-700 uppercase mb-1">
-                Student Name <span className="text-[10px] text-slate-400">(optional, e.g. manvi)</span>
+                Student Name * <span className="text-[10px] text-slate-400">(e.g. manvi / manvi gupta)</span>
               </label>
               <input
                 type="text"
@@ -156,18 +180,18 @@ export default function CheckResultPage() {
                 onChange={(e) => setNameInput(e.target.value)}
                 placeholder="Enter Student Name"
                 className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 font-medium"
+                required
               />
             </div>
             <div>
-              <label className="block font-bold text-slate-700 uppercase mb-1">
-                Roll Number <span className="text-[10px] text-slate-400">(optional)</span>
-              </label>
+              <label className="block font-bold text-slate-700 uppercase mb-1">Roll Number *</label>
               <input
                 type="text"
                 value={rollInput}
                 onChange={(e) => setRollInput(e.target.value)}
                 placeholder="e.g. 103766"
-                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 font-mono font-medium"
+                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 font-mono font-bold"
+                required
               />
             </div>
           </div>
@@ -214,7 +238,7 @@ export default function CheckResultPage() {
           </div>
         )}
 
-        {/* Result card - Pass/Fail + Grade ONLY. No subject marks, no certificate. */}
+        {/* Result card - Grade + Pass/Fail ONLY. No subject marks, no certificate. */}
         {result && (
           <div className="bg-white p-6 rounded-2xl shadow-md border border-slate-200 space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
@@ -235,9 +259,9 @@ export default function CheckResultPage() {
             <div className="flex justify-center py-4 bg-slate-100 rounded-xl border border-slate-200">
               <div className="w-full max-w-md bg-white border-2 border-slate-900 rounded-xl p-5 shadow-lg space-y-4">
                 <div className="flex items-center justify-between gap-3 border-b-2 border-slate-900 pb-2">
-                  <img src="/mitm-logo.png" alt="MITM" className="h-10 object-contain" onError={(e: any) => (e.target.style.display = 'none')} />
-                  <img src="/manavta-text-logo.png" alt="MANAVTA" className="h-7 object-contain flex-1" onError={(e: any) => (e.target.style.display = 'none')} />
-                  <img src="/iso-certified-badge.png" alt="ISO" className="h-9 object-contain" onError={(e: any) => (e.target.style.display = 'none')} />
+                  <img src="/logo.png" alt="Logo" className="h-10 object-contain" onError={(e: any) => (e.target.style.display = 'none')} />
+                  <img src="/logo2.png" alt="Manavta Institute" className="h-7 object-contain flex-1" onError={(e: any) => (e.target.style.display = 'none')} />
+                  <img src="/site.jpg" alt="Badge" className="h-9 object-contain" onError={(e: any) => (e.target.style.display = 'none')} />
                 </div>
 
                 <div className="flex items-start gap-4">
@@ -247,7 +271,6 @@ export default function CheckResultPage() {
                     <div><span className="font-bold">Name:</span> <span className="uppercase">{result.student_name}</span></div>
                     <div><span className="font-bold">Fathers Name:</span> <span className="uppercase">{result.father_name}</span></div>
                     <div><span className="font-bold">Course:</span> {result.course_name}</div>
-                    <div><span className="font-bold">Percentage:</span> {result.percentage}%</div>
                     <div><span className="font-bold">Grade:</span> {result.grade}</div>
                     <div><span className="font-bold">Result:</span> {result.result === 'PASS' ? 'Pass' : 'Fail'}</div>
                     <div><span className="font-bold">Study Center:</span> {result.study_center}</div>

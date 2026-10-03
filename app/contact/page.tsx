@@ -278,7 +278,7 @@ export default function ContactUsPage() {
           </div>
 
           {/* RIGHT: BILARI HEAD CAMPUS CARD & WHATSAPP CHANNEL (5 COLS) */}
-          <div className="lg:col-span-5 space-y-6">
+          <div className="lg:col-span-5 space-y-5">
             
             {/* BILARI HEAD CAMPUS CARD */}
             <div className="bg-[#2D221C] text-[#FAF7F2] rounded-3xl p-6 sm:p-7 shadow-xl border border-[#3D2E26] space-y-5 relative overflow-hidden">
@@ -332,10 +332,10 @@ export default function ContactUsPage() {
             </div>
 
             {/* OFFICIAL WHATSAPP CHANNEL CARD */}
-            <div className="bg-white rounded-3xl p-6 shadow-md border border-[#EAE2D8] space-y-4">
+            <div className="bg-white rounded-3xl p-6 shadow-md border border-[#EAE2D8] space-y-3.5">
               <div className="flex items-center gap-3">
-                <div className="p-3 bg-[#25D366]/10 text-[#25D366] rounded-2xl">
-                  <Radio className="w-6 h-6" />
+                <div className="p-2.5 bg-[#25D366]/10 text-[#25D366] rounded-2xl shrink-0">
+                  <Radio className="w-5 h-5" />
                 </div>
                 <div>
                   <h4 className="text-base font-extrabold text-[#2D221C]">Manavta Institute WhatsApp Channel</h4>
@@ -347,9 +347,9 @@ export default function ContactUsPage() {
                 href={campusInfo.channelUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="w-full py-3 bg-[#25D366] hover:bg-[#1EBE57] text-white font-bold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-2 transition shadow-md"
+                className="w-full py-3 bg-[#25D366] hover:bg-[#1EBE57] text-white font-bold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-2 transition shadow-sm"
               >
-                <Share2 className="w-4 h-4" />
+                <Share2 className="w-3.5 h-3.5" />
                 Join Manavta Institute Channel
               </a>
             </div>
@@ -369,53 +369,8 @@ export default function ContactUsPage() {
                 ></iframe>
               </div>
             </div>
-
-          </div>
-
-        </div>
-
-        {/* SECTION 2: INSTITUTIONAL HIGHLIGHTS */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-white p-6 rounded-2xl border border-[#EAE2D8] shadow-sm flex items-start gap-4">
-            <div className="p-3 bg-[#FAF5EF] text-[#C29B72] rounded-2xl border border-[#EAE2D8]">
-              <ShieldCheck className="w-6 h-6" />
-            </div>
-            <div>
-              <h5 className="font-extrabold text-[#2D221C] text-sm">ISO Certified</h5>
-              <p className="text-xs text-[#7A6B62] mt-1">ISO 9001:2015 Accredited Quality Education Standard.</p>
-            </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-2xl border border-[#EAE2D8] shadow-sm flex items-start gap-4">
-            <div className="p-3 bg-[#FAF5EF] text-[#C29B72] rounded-2xl border border-[#EAE2D8]">
-              <Award className="w-6 h-6" />
-            </div>
-            <div>
-              <h5 className="font-extrabold text-[#2D221C] text-sm">Online Verification</h5>
-              <p className="text-xs text-[#7A6B62] mt-1">Instant Marksheet & Certificate validation on portal.</p>
-            </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-2xl border border-[#EAE2D8] shadow-sm flex items-start gap-4">
-            <div className="p-3 bg-[#FAF5EF] text-[#C29B72] rounded-2xl border border-[#EAE2D8]">
-              <GraduationCap className="w-6 h-6" />
-            </div>
-            <div>
-              <h5 className="font-extrabold text-[#2D221C] text-sm">Job Oriented Courses</h5>
-              <p className="text-xs text-[#7A6B62] mt-1">Software, Accounting, Tally, DEO, DTP & Web Skills.</p>
-            </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-2xl border border-[#EAE2D8] shadow-sm flex items-start gap-4">
-            <div className="p-3 bg-[#FAF5EF] text-[#C29B72] rounded-2xl border border-[#EAE2D8]">
-              <Users className="w-6 h-6" />
-            </div>
-            <div>
-              <h5 className="font-extrabold text-[#2D221C] text-sm">Free Counseling</h5>
-              <p className="text-xs text-[#7A6B62] mt-1">Expert guidance for career and course selection.</p>
-            </div>
-          </div>
-        </div>
+          </div>        
+      </div>
 
         {/* SECTION 3: FAQ ACCORDION */}
         <div className="bg-white rounded-3xl p-6 sm:p-10 shadow-md border border-[#EAE2D8] max-w-4xl mx-auto space-y-6">
@@ -452,7 +407,7 @@ export default function ContactUsPage() {
         {/* SECTION 4: CALL TO ACTION BANNER (USING NEXT.JS LINK TAG) */}
         <div className="bg-[#2D221C] text-[#FAF7F2] rounded-3xl p-8 sm:p-10 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-6 border-b-4 border-[#C29B72]">
           <div className="space-y-2 text-center sm:text-left">
-            <h3 className="text-xl sm:text-2xl font-black text-white">Admissions Open For Academic Session 2025–2027!</h3>
+            <h3 className="text-xl sm:text-2xl font-black text-white">Admissions Open... Just Enroll Now!</h3>
             <p className="text-[#E2D8CD] text-xs sm:text-sm">Reserve your seat online and complete your enrollment process today.</p>
           </div>
           <div className="flex gap-3">

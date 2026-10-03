@@ -219,7 +219,7 @@ export default function MITMAdminMasterDashboard() {
     aadhar_no: '',
     photo_url: 'https://iili.io/3jruEzl.md.jpg',
     address: '',
-    study_center: 'MITM Bilari Campus'
+    study_center: 'Manavta Institute'
   });
   const [editingStudent, setEditingStudent] = useState<StudentRecord | null>(null);
 
@@ -576,7 +576,7 @@ export default function MITMAdminMasterDashboard() {
       aadhar_no: '',
       photo_url: 'https://iili.io/3jruEzl.md.jpg',
       address: '',
-      study_center: 'MITM Bilari Campus'
+      study_center: 'Manavta Institute'
     });
 
     alert("✅ Direct Student Registered & Saved to Database!");
@@ -665,6 +665,9 @@ export default function MITMAdminMasterDashboard() {
       return;
     }
 
+    const qrText = `Manavta Institute\nName: ${student.student_name}\nEnrollment No: ${student.enrollment_no}\nCourse: ${student.course_name}`;
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(qrText)}`;
+
     printWindow.document.write(`
 <!DOCTYPE html>
 <html>
@@ -680,8 +683,8 @@ body {
   margin: 0;
   padding: 20px;
   display: flex;
-  justify-content: center;
-  align-items: flex-start;
+  flex-direction: column;
+  align-items: center;
   background-color: #ffffff;
 }
 @media print {
@@ -691,6 +694,14 @@ body {
   .id-card-box {
     box-shadow: none !important;
   }
+}
+.card-label {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #64748b;
+  margin: 3mm 0 1.5mm 0;
 }
 /* ID CARD WITH EXACT AADHAR SIZE: 85.6mm x 53.9mm (LANDSCAPE) */
 .id-card-box {
@@ -713,7 +724,7 @@ body {
   align-items: center;
   border-bottom: 1.5px solid #0284c7;
   padding-bottom: 1.5mm;
-  margin-bottom: 3.5mm;
+  margin-bottom: 1.5mm;
 }
 .header-logos img {
   height: 6mm;
@@ -724,10 +735,9 @@ body {
 }
 .card-body {
   display: flex;
-  gap: 3.5mm;
+  gap: 2.5mm;
   align-items: flex-start;
   flex: 1;
-  margin-top:5mm;
 }
 .photo-box {
   width: 13.5mm;
@@ -765,25 +775,66 @@ body {
 .footer-sig {
   display: flex;
   justify-content: space-between;
-  align-items: flex-end;
+  align-items: center;
   border-top: 1px solid #e2e8f0;
   padding-top: 1mm;
   font-size: 5.5pt;
 }
-.sig-img {
-  height: 4mm;
-  object-fit: contain;
-  margin-bottom: 0.5mm;
+.qr-box {
+  text-align: center;
+}
+.qr-box img {
+  width: 10mm;
+  height: 10mm;
+}
+.qr-box div {
+  font-size: 4.2pt;
+  font-weight: 800;
+  margin-top: 0.3mm;
+  text-transform: uppercase;
+}
+.back-title {
+  text-align: center;
+  font-size: 6.8pt;
+  font-weight: 900;
+  text-transform: uppercase;
+  border-bottom: 1.5px solid #0284c7;
+  padding-bottom: 1mm;
+  margin-bottom: 1.5mm;
+  color: #0f172a;
+}
+.back-points {
+  font-size: 5.3pt;
+  line-height: 1.5;
+  color: #0f172a;
+  flex: 1;
+}
+.back-points ol {
+  margin: 0;
+  padding-left: 3mm;
+}
+.back-points li {
+  margin-bottom: 0.6mm;
+}
+.back-footer {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 1mm;
+  font-size: 5pt;
+  line-height: 1.4;
+  text-align: center;
+  color: #334155;
 }
 </style>
 </head>
 <body>
+
+<div class="card-label">   </div>
 <div class="id-card-box">
   <div>
     <div class="header-logos">
-      <img src="/logo.png" alt="MITM Logo" />
-      <img src="/logo2.png" class="logo-center" alt="MANAVTA Text Logo" onError="this.style.display='none'" />
-      <img src="/site.jpg" alt="ISO Badge" />
+      <img src="/logo.png" alt="Logo" onerror="this.style.display='none'" />
+      <img src="/logo2.png" class="logo-center" alt="Manavta Institute" onerror="this.style.display='none'" />
+      <img src="/site.jpg" alt="Badge" onerror="this.style.display='none'" />
     </div>
 
     <div class="card-body">
@@ -791,10 +842,11 @@ body {
         <img src="${student.photo_url || 'https://iili.io/3jruEzl.md.jpg'}" alt="Photo" />
       </div>
       <div class="details-box">
+      <div><span class="label">Roll No:</span> <strong style="color:#0f172a;">${student.roll_no}</strong></div>
+        <div><span class="label">Enrollment:</span> <strong>${student.enrollment_no}</strong></div>
         <div><span class="label">Candidate:</span> <strong>${student.student_name}</strong></div>
         <div><span class="label">Father:</span> ${student.father_name}</div>
-        <div><span class="label">Roll No:</span> <strong style="color:#0f172a;">${student.roll_no}</strong></div>
-        <div><span class="label">Enrollment:</span> <strong>${student.enrollment_no}</strong></div>
+        
         <div><span class="label">Course:</span> ${student.course_name}</div>
         <div><span class="label">Session:</span> ${student.session}</div>
       </div>
@@ -802,14 +854,33 @@ body {
   </div>
 
   <div class="footer-sig">
-    <div style="max-width: 50mm; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+    <div style="max-width: 50mm; overflow: hidden; pl-4;text-overflow: ellipsis; white-space: nowrap;">
       <span style="color: #64748b; font-weight: bold;">Center:</span>
       <strong>${student.study_center}</strong>
     </div>
-    <div style="text-align: center;">
-      <img src="/authorised-signature.png" class="sig-img" alt="Sig" onError="this.style.display='none'" />
-      <div style="font-weight: bold; border-top: 1px solid #000; padding-top: 0.5mm; text-transform: uppercase;">Authorised Signatory</div>
+    <div class="qr-box">
+      <img src="${qrUrl}" alt="QR" />
+      <div>Scan to Verify</div>
     </div>
+  </div>
+</div>
+
+<div class="card-label">   </div>
+<div class="id-card-box">
+  <div class="back-title">Instructions </div>
+  <div class="back-points">
+    <ol>
+      <li>This identity card is for the limited purpose for proving Candidates's Identity at Manavta Institute only.</li>
+      <li>If lost, report immediately to the institute office; a duplicate may be issued on request.</li>
+      <li>This card is non-transferable and valid only for the course &amp; session shown on the front.</li>
+      <li>Please go through the details of Name, Date of Birth, Father's Name, Roll No, Enrollment No, in case of find any inaccuracy report back the same immediately. </li>
+      <li>Institute Name- Manavta Institute Bilari, Moradabad-244411</li>
+      <li>Course: <strong>${student.course_name}</strong></li>
+    </ol>
+  </div>
+  <div class="back-footer">
+    If found, please return to: <strong>Manavta Institute of Technology and Management</strong>, Station Road, Bilari, Moradabad, Uttar Pradesh &mdash; 244411<br/>
+    +91 9897513656 / +91 8923130448
   </div>
 </div>
 
@@ -823,7 +894,6 @@ window.onload = function() {
 `);
     printWindow.document.close();
   };
-
   // FILTERED & SORTED LISTS MEMO
   const filteredStudents = useMemo(() => {
     return studentsList
@@ -875,14 +945,14 @@ window.onload = function() {
       <header className="bg-slate-800 mb-5 text-white shadow-lg sticky top-0 z-30 border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-sky-600 rounded-xl flex items-center justify-center font-black text-xl text-white shadow">
-              M
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center font-black text-xl text-white shadow">
+              <img src="/logo.png"></img>
             </div>
             <div>
               <h1 className="text-lg font-black tracking-wide uppercase text-white">
                 MITM Admin Portal
               </h1>
-              <p className="text-xs text-sky-400 font-medium">
+              <p className="text-xs text-amber-200 font-medium">
                 Manavta Institute of Technology & Management
               </p>
             </div>
@@ -994,7 +1064,7 @@ window.onload = function() {
                     <input
                       type="text"
                       required
-                      placeholder="e.g. MITM Bilari Campus"
+                      placeholder="e.g. Manavta Institute"
                       value={newBranch.institute_name}
                       onChange={(e) => setNewBranch({ ...newBranch, institute_name: e.target.value })}
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-sky-500"
@@ -1817,11 +1887,12 @@ window.onload = function() {
             </div>
 
             {/* ID CARD CONTAINER WITH LANDSCAPE AADHAR SIZE & 3 LOGOS */}
+                        
             <div className="p-3 bg-white rounded-xl border-2 border-slate-900 space-y-2 shadow-sm mx-auto" style={{ width: '320px', height: '200px' }}>
               <div className="flex items-center justify-between border-b-2 border-sky-600 pb-1.5">
-                <img src="/logo.png" alt="Logo 1" className="h-6 object-contain" onError={(e: any) => e.target.src='https://iili.io/3jruEzl.md.jpg'} />
-                <img src="/logo2.png" alt="MANAVTA Text" className="h-5 object-contain" onError={(e: any) => e.target.style.display='none'} />
-                <img src="/site.jpg" alt="Logo 3" className="h-6 object-contain" onError={(e: any) => e.target.src='https://iili.io/3jruEzl.md.jpg'} />
+                <img src="/logo.png" alt="Logo" className="h-6 object-contain" onError={(e: any) => e.target.style.display='none'} />
+                <img src="/logo2.png" alt="Manavta Institute" className="h-5 object-contain" onError={(e: any) => e.target.style.display='none'} />
+                <img src="/site.jpg" alt="Badge" className="h-6 object-contain" onError={(e: any) => e.target.style.display='none'} />
               </div>
 
               <div className="flex items-start gap-2.5 pt-1">
@@ -1841,11 +1912,16 @@ window.onload = function() {
                   <span className="text-slate-500 font-bold">Center:</span> <strong>{viewingIdCardStudent.study_center}</strong>
                 </div>
                 <div className="text-center">
-                  <img src="/authorised-signature.png" className="h-3 object-contain mx-auto" alt="Sig" onError={(e: any) => e.target.style.display='none'} />
-                  <div className="font-bold border-t border-black pt-0.5 text-[8px] uppercase">Authorised Signatory</div>
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(`Manavta Institute\nName: ${viewingIdCardStudent.student_name}\nEnrollment No: ${viewingIdCardStudent.enrollment_no}\nCourse: ${viewingIdCardStudent.course_name}`)}`}
+                    className="h-7 w-7 object-contain mx-auto"
+                    alt="QR"
+                  />
+                  <div className="font-bold text-[6px] uppercase">Scan to Verify</div>
                 </div>
               </div>
             </div>
+            
 
             <div className="flex justify-end gap-3 pt-2">
               <button
@@ -1854,6 +1930,7 @@ window.onload = function() {
               >
                 Close Preview
               </button>
+
               <button
                 onClick={() => {
                   printIDCard(viewingIdCardStudent);

@@ -164,6 +164,34 @@ export default function MarksheetTabComponent({ studentsList = [] }: MarksheetTa
   // ---------------------------------------------------------------------
   // Form helpers
   // ---------------------------------------------------------------------
+  // PHOTO UPLOAD VALIDATION HANDLER (JPG/PNG <= 200KB)
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+    if (!validTypes.includes(file.type)) {
+      alert('❌ Photo must be in JPG or PNG format only!');
+      e.target.value = '';
+      return;
+    }
+
+    const maxSizeBytes = 200 * 1024;
+    if (file.size > maxSizeBytes) {
+      alert(`❌ Photo size exceeds 200KB limit! (Selected file size: ${(file.size / 1024).toFixed(1)}KB)`);
+      e.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        setFormData((prev) => ({ ...prev, photo_url: event.target!.result as string }));
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleRollNoChange = (rollVal: string) => {
     setFormData((prev) => ({ ...prev, roll_no: rollVal }));
     if (!rollVal.trim()) return;
@@ -544,7 +572,7 @@ export default function MarksheetTabComponent({ studentsList = [] }: MarksheetTa
                 {photoIsData ? (
                   <div className="flex items-center gap-2 px-2 py-1 border border-slate-300 rounded-lg bg-white">
                     <img src={formData.photo_url} alt="" className="w-8 h-9 object-cover rounded border" />
-                    <span className="text-[11px] font-bold text-black flex-1">✅ Auto-filled from student record</span>
+                    <span className="text-[11px] font-bold text-black flex-1">✅ Photo set</span>
                     <button
                       type="button"
                       onClick={() => setFormData({ ...formData, photo_url: '' })}
@@ -556,11 +584,10 @@ export default function MarksheetTabComponent({ studentsList = [] }: MarksheetTa
                   </div>
                 ) : (
                   <input
-                    type="text"
-                    value={formData.photo_url}
-                    onChange={(e) => setFormData({ ...formData, photo_url: e.target.value })}
-                    placeholder="https://... (auto-fills from Roll No)"
-                    className="w-full px-3 py-2 border text-black border-slate-300 rounded-lg text-xs bg-white"
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png"
+                    onChange={handlePhotoUpload}
+                    className="w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100"
                   />
                 )}
               </div>
@@ -934,14 +961,12 @@ export default function MarksheetTabComponent({ studentsList = [] }: MarksheetTa
                 <div className="text-center">
                   <img src={buildQrUrl(viewingMarksheet, 120)} alt="QR" className="w-16 h-16 mx-auto mb-1 border border-black p-1 bg-white" />
                   <div className="text-[8px] font-black uppercase">SCAN TO VERIFY</div>
-                  <div className="text-[10px] font-bold mb-4 mt-2">DATE: {formatDate(viewingMarksheet.issue_date)}</div>
+                  <div className="text-[10px] font-bold mb-4">DATE: {formatDate(viewingMarksheet.issue_date)}</div>
                 </div>
 
                 <div className="text-center w-36">
                   
                   <div className="border-t border-black pt-1 text-[9px] font-bold uppercase">CHIEF EXAM CONTROLLER</div>
-
-                  
                 </div>
               </div>
             </div>

@@ -15,11 +15,12 @@ interface StudentHit {
   father_name: string;
   course_name: string;
   study_center: string;
+  session?: string;
   photo_url?: string;
 }
 
 // Only the columns this page actually needs -> fast query, no heavy data
-const SELECT_COLS = 'id,roll_no,enrollment_no,student_name,father_name,course_name,study_center,photo_url';
+const SELECT_COLS = 'id,roll_no,enrollment_no,student_name,father_name,course_name,study_center,session,photo_url';
 
 export default function VerifyRegistrationPage() {
   const [nameInput, setNameInput] = useState('');
@@ -181,9 +182,9 @@ export default function VerifyRegistrationPage() {
             <div className="flex justify-center py-4 bg-slate-100 rounded-xl border border-slate-200">
               <div className="w-full max-w-md bg-white border-2 border-slate-900 rounded-xl p-5 shadow-lg space-y-4">
                 <div className="flex items-center justify-between gap-3 border-b-2 border-slate-900 pb-2">
-                  <img src="/mitm-logo.png" alt="MITM" className="h-10 object-contain" onError={(e: any) => (e.target.style.display = 'none')} />
-                  <img src="/manavta-text-logo.png" alt="MANAVTA" className="h-7 object-contain flex-1" onError={(e: any) => (e.target.style.display = 'none')} />
-                  <img src="/iso-certified-badge.png" alt="ISO" className="h-9 object-contain" onError={(e: any) => (e.target.style.display = 'none')} />
+                  <img src="/logo.png" alt="Logo" className="h-10 object-contain" onError={(e: any) => (e.target.style.display = 'none')} />
+                  <img src="/logo2.png" alt="Manavta Institute" className="h-7 object-contain flex-1" onError={(e: any) => (e.target.style.display = 'none')} />
+                  <img src="/site.jpg" alt="Badge" className="h-9 object-contain" onError={(e: any) => (e.target.style.display = 'none')} />
                 </div>
 
                 <div className="flex items-start gap-4">
@@ -204,13 +205,14 @@ export default function VerifyRegistrationPage() {
               </div>
             </div>
 
-            <div className="flex justify-center pt-2">
+            <div className="flex flex-col items-center gap-2 pt-2">
               <button
                 onClick={handlePrint}
                 className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow transition cursor-pointer flex items-center gap-2"
               >
                 🖨️ Print / Download ID Card
               </button>
+              <p className="text-[10px] text-slate-400">Prints both the front and back of the card, Aadhar size (85.6mm × 53.9mm).</p>
             </div>
           </div>
         )}

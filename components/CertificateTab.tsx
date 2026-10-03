@@ -28,14 +28,11 @@ interface CertificateTabProps {
   studentsList?: any[];
 }
 
-const PLACEHOLDER_PHOTO = 'https://iili.io/3jruEzl.md.jpg';
+const PLACEHOLDER_PHOTO = ' ';
 
 // Everything EXCEPT photo_url -> list loads very fast
 const LIST_COLS =
   'id,roll_no,enrollment_no,student_name,father_name,course_name,start_date,end_date,grade,issue_date,session,serial_no,study_center,des,dob,created_at';
-
-const DEFAULT_AWARD_MATTER =
-  'This is to certify that the candidate named below has successfully completed the prescribed course of study and passed the final assessment with credit.';
 
 const mapRow = (r: any): CertificateRecord => ({
   id: r.id,
@@ -56,21 +53,31 @@ const mapRow = (r: any): CertificateRecord => ({
   dob: r.dob || '',
 });
 
-export default function CertificateTabComponent({ studentsList = [] }: CertificateTabProps) {
-  const [awardMatter, setAwardMatter] = useState(DEFAULT_AWARD_MATTER);
+const emptyManualFields = () => ({
+  student_name: '',
+  father_name: '',
+  enrollment_no: '',
+  course_name: '',
+  session: '2026-2027',
+  study_center: 'Manavta Institute',
+  serial_no: '',
+  photo_url: '',
+});
 
+export default function CertificateTabComponent({ studentsList = [] }: CertificateTabProps) {
   const [certificatesList, setCertificatesList] = useState<CertificateRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
   // Generate form
   const [rollInput, setRollInput] = useState('');
-  const [autoStudent, setAutoStudent] = useState<any>(null);
+  const [manual, setManual] = useState(emptyManualFields());
   const [desVal, setDesVal] = useState('S/O');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [gradeVal, setGradeVal] = useState('A');
   const [issueDateVal, setIssueDateVal] = useState(new Date().toISOString().split('T')[0]);
+  const [matchedStudent, setMatchedStudent] = useState(false);
 
   // Search / sort / select
   const [searchQuery, setSearchQuery] = useState('');
@@ -114,42 +121,92 @@ export default function CertificateTabComponent({ studentsList = [] }: Certifica
   };
 
   // ---------------------------------------------------------------------
-  // Auto-fetch student by Roll No
+  // PHOTO UPLOAD VALIDATION HANDLER (JPG/PNG <= 200KB) - same rule as elsewhere
+  // ---------------------------------------------------------------------
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+    if (!validTypes.includes(file.type)) {
+      alert('❌ Photo must be in JPG or PNG format only!');
+      e.target.value = '';
+      return;
+    }
+
+    const maxSizeBytes = 200 * 1024;
+    if (file.size > maxSizeBytes) {
+      alert(`❌ Photo size exceeds 200KB limit! (Selected file size: ${(file.size / 1024).toFixed(1)}KB)`);
+      e.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        setManual((prev) => ({ ...prev, photo_url: event.target!.result as string }));
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // ---------------------------------------------------------------------
+  // Auto-fetch student by Roll No. If a match is found, fields are
+  // pre-filled but stay EDITABLE. If no match is found (student not
+  // registered yet), the admin can still type everything in manually -
+  // the form is never blocked.
   // ---------------------------------------------------------------------
   const handleRollSearch = (rollVal: string) => {
     setRollInput(rollVal);
     const found = studentsList.find((s) => (s.roll_no || '') === rollVal.trim());
-    setAutoStudent(found || null);
+
+    if (found) {
+      setMatchedStudent(true);
+      setManual({
+        student_name: found.student_name || '',
+        father_name: found.father_name || '',
+        enrollment_no: found.enrollment_no || '',
+        course_name: found.course_name || '',
+        session: found.session || '2026-2027',
+        study_center: found.study_center || 'Manavta Institute',
+        serial_no: found.serial_no || `DN-${Math.floor(1000 + Math.random() * 9000)}`,
+        photo_url: found.photo_url || '',
+      });
+    } else {
+      setMatchedStudent(false);
+      // Don't wipe out what the admin may have already typed manually
+    }
   };
 
   // ---------------------------------------------------------------------
-  // GENERATE -> save in DB
+  // GENERATE -> save in DB (works with or without an auto-matched student)
   // ---------------------------------------------------------------------
   const handleGenerateCertificate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!autoStudent) {
-      alert('No approved student found with this Roll No. Please enter a valid Roll Number.');
+
+    if (!rollInput.trim() || !manual.student_name.trim() || !manual.father_name.trim() || !manual.course_name.trim()) {
+      alert('Roll No, Candidate Name, Father Name and Course Name are required.');
       return;
     }
 
     setIsSaving(true);
 
     const payload = {
-      roll_no: autoStudent.roll_no,
-      enrollment_no: autoStudent.enrollment_no,
-      student_name: autoStudent.student_name,
-      father_name: autoStudent.father_name,
-      course_name: autoStudent.course_name,
+      roll_no: rollInput.trim(),
+      enrollment_no: manual.enrollment_no.trim() || `ENR-${Date.now().toString().slice(-6)}`,
+      student_name: manual.student_name.trim().toUpperCase(),
+      father_name: manual.father_name.trim().toUpperCase(),
+      course_name: manual.course_name.trim(),
       start_date: startDate,
       end_date: endDate,
       grade: gradeVal.trim().toUpperCase(),
       issue_date: issueDateVal,
-      session: autoStudent.session || '',
-      serial_no: autoStudent.serial_no || `DN-${Math.floor(1000 + Math.random() * 9000)}`,
-      photo_url: autoStudent.photo_url || PLACEHOLDER_PHOTO,
-      study_center: autoStudent.study_center || 'MITM BILARI',
+      session: manual.session.trim(),
+      serial_no: manual.serial_no.trim() || `DN-${Math.floor(1000 + Math.random() * 9000)}`,
+      photo_url: manual.photo_url || PLACEHOLDER_PHOTO,
+      study_center: manual.study_center.trim() || 'Manavta Institute',
       des: desVal,
-      dob: autoStudent.dob || '',
+      dob: '',
     };
 
     const { data, error } = await supabase.from('certificates').insert([payload]).select(LIST_COLS).single();
@@ -164,7 +221,8 @@ export default function CertificateTabComponent({ studentsList = [] }: Certifica
 
     setCertificatesList([mapRow(data), ...certificatesList]);
     setRollInput('');
-    setAutoStudent(null);
+    setManual(emptyManualFields());
+    setMatchedStudent(false);
     alert('🎉 Certificate Generated & Saved Successfully!');
   };
 
@@ -213,7 +271,7 @@ export default function CertificateTabComponent({ studentsList = [] }: Certifica
   const handlePrint = async (c: CertificateRecord) => {
     const win = window.open('', '_blank'); // open right away (keeps popup permission)
     const full = await withPhoto(c);
-    printCertificate(full, awardMatter, {}, win);
+    printCertificate(full, {}, win);
   };
 
   const handleView = async (c: CertificateRecord) => {
@@ -259,39 +317,24 @@ export default function CertificateTabComponent({ studentsList = [] }: Certifica
       return a.issue_date.localeCompare(b.issue_date);
     });
 
+  const photoIsData = manual.photo_url.startsWith('data:');
+
   return (
     <div className="space-y-8">
-      {/* AWARD MATTER */}
-      <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-md border border-slate-200 space-y-4">
-        <div className="border-b pb-3">
-          <h2 className="text-base font-bold text-slate-900 uppercase tracking-wide flex items-center gap-2">
-            <span>📜</span> Pre-Configured Certificate Award Matter
-          </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Default verification statement text printed on official certificates.
-          </p>
-        </div>
-
-        <textarea
-          value={awardMatter}
-          onChange={(e) => setAwardMatter(e.target.value)}
-          rows={3}
-          className="w-full p-3 border border-slate-300 rounded-xl text-xs font-serif leading-relaxed focus:ring-2 focus:ring-amber-500 bg-amber-50/50 text-black"
-        />
-      </div>
-
       {/* GENERATE FORM */}
       <form onSubmit={handleGenerateCertificate} className="bg-white p-6 sm:p-8 rounded-2xl shadow-md border border-slate-200 space-y-6">
         <div className="border-b pb-4">
           <h2 className="text-base font-bold text-slate-900 uppercase tracking-wide flex items-center gap-2">
-            <span>🎓</span> Generate Student Certificate (Auto-Fetch by Roll No)
+            <span>🎓</span> Generate Student Certificate
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">Enter candidate Roll No to auto-fill details from database.</p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Enter Roll No — if the student is already registered, details auto-fill (still editable). If not registered yet, just type everything in manually.
+          </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
           <div>
-            <label className="block font-bold text-slate-700 uppercase mb-1">Enter Roll No *</label>
+            <label className="block font-bold text-slate-700 uppercase mb-1">Roll No *</label>
             <input
               type="text"
               value={rollInput}
@@ -300,29 +343,119 @@ export default function CertificateTabComponent({ studentsList = [] }: Certifica
               className="w-full px-3 py-2 border-2 border-amber-500 rounded-lg font-mono font-bold text-sm bg-amber-50 focus:outline-none text-black"
               required
             />
-            {rollInput && !autoStudent && (
-              <p className="text-[10px] text-rose-600 font-bold mt-1">No approved student found for this Roll No</p>
+            {rollInput && !matchedStudent && (
+              <p className="text-[10px] text-amber-700 font-bold mt-1">
+                Not found in registered students — fill details manually below.
+              </p>
+            )}
+            {matchedStudent && (
+              <p className="text-[10px] text-emerald-700 font-bold mt-1">✅ Auto-filled from registered student</p>
             )}
           </div>
 
           <div>
-            <label className="block font-bold text-slate-700 uppercase mb-1">Candidate Name</label>
-            <input type="text" value={autoStudent ? autoStudent.student_name : ''} placeholder="Auto-filled Name" className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold bg-slate-100 uppercase text-black" readOnly />
+            <label className="block font-bold text-slate-700 uppercase mb-1">Candidate Name *</label>
+            <input
+              type="text"
+              value={manual.student_name}
+              onChange={(e) => setManual({ ...manual, student_name: e.target.value })}
+              placeholder="Candidate Full Name"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold bg-white uppercase text-black"
+              required
+            />
           </div>
 
           <div>
-            <label className="block font-bold text-slate-700 uppercase mb-1">Father's Name</label>
-            <input type="text" value={autoStudent ? autoStudent.father_name : ''} placeholder="Auto-filled Father Name" className="w-full px-3 py-2 border border-slate-300 rounded-lg font-semibold bg-slate-100 uppercase text-black" readOnly />
+            <label className="block font-bold text-slate-700 uppercase mb-1">Father's Name *</label>
+            <input
+              type="text"
+              value={manual.father_name}
+              onChange={(e) => setManual({ ...manual, father_name: e.target.value })}
+              placeholder="Father Full Name"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg font-semibold bg-white uppercase text-black"
+              required
+            />
           </div>
 
           <div>
             <label className="block font-bold text-slate-700 uppercase mb-1">Enrollment No</label>
-            <input type="text" value={autoStudent ? autoStudent.enrollment_no : ''} placeholder="Auto-filled Enrollment" className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono font-bold bg-slate-100 text-black" readOnly />
+            <input
+              type="text"
+              value={manual.enrollment_no}
+              onChange={(e) => setManual({ ...manual, enrollment_no: e.target.value })}
+              placeholder="Leave blank to auto-generate"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono font-bold bg-white text-black"
+            />
           </div>
 
           <div>
-            <label className="block font-bold text-slate-700 uppercase mb-1">Course Name</label>
-            <input type="text" value={autoStudent ? autoStudent.course_name : ''} placeholder="Auto-filled Course Name" className="w-full px-3 py-2 border border-slate-300 rounded-lg font-semibold bg-slate-100 uppercase text-black" readOnly />
+            <label className="block font-bold text-slate-700 uppercase mb-1">Course Name *</label>
+            <input
+              type="text"
+              value={manual.course_name}
+              onChange={(e) => setManual({ ...manual, course_name: e.target.value })}
+              placeholder="Course Name"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg font-semibold bg-white uppercase text-black"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block font-bold text-slate-700 uppercase mb-1">Session</label>
+            <input
+              type="text"
+              value={manual.session}
+              onChange={(e) => setManual({ ...manual, session: e.target.value })}
+              placeholder="e.g. 2025-2027"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg font-semibold bg-white text-black"
+            />
+          </div>
+
+          <div>
+            <label className="block font-bold text-slate-700 uppercase mb-1">Study Center</label>
+            <input
+              type="text"
+              value={manual.study_center}
+              onChange={(e) => setManual({ ...manual, study_center: e.target.value })}
+              placeholder="e.g. Manavta Institute"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg font-semibold bg-white text-black"
+            />
+          </div>
+
+          <div>
+            <label className="block font-bold text-slate-700 uppercase mb-1">Document No</label>
+            <input
+              type="text"
+              value={manual.serial_no}
+              onChange={(e) => setManual({ ...manual, serial_no: e.target.value })}
+              placeholder="e.g. DN-3754"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono font-bold bg-white text-black"
+            />
+          </div>
+
+          <div>
+            <label className="block font-bold text-slate-700 uppercase mb-1">Candidate Photo</label>
+            {photoIsData ? (
+              <div className="flex items-center gap-2 px-2 py-1 border border-slate-300 rounded-lg bg-white">
+                <img src={manual.photo_url} alt="" className="w-8 h-9 object-cover rounded border" />
+                <span className="text-[11px] font-bold text-black flex-1">✅ Photo set</span>
+                <button
+                  type="button"
+                  onClick={() => setManual({ ...manual, photo_url: '' })}
+                  className="text-rose-600 font-bold text-xs"
+                  title="Remove photo"
+                >
+                  ✕
+                </button>
+              </div>
+            ) : (
+              <input
+                type="file"
+                accept="image/jpeg,image/jpg,image/png"
+                onChange={handlePhotoUpload}
+                className="w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100"
+              />
+            )}
           </div>
 
           <div>
@@ -467,17 +600,12 @@ export default function CertificateTabComponent({ studentsList = [] }: Certifica
                 <div className="space-y-2">
                   <div>Enrollment No: <strong>{viewingCert.enrollment_no}</strong></div>
                   <div>Roll No: <strong>{viewingCert.roll_no}</strong></div>
-                  <div className="text-sm">Session: <strong>
-                    {viewingCert.session}</strong></div>
-                  
+                  <div className="text-sm">Session: <strong>{viewingCert.session}</strong></div>
                 </div>
-                <div>
-                <div className="text-sm mb-2 ml-2"><strong>
-                {viewingCert.serial_no}</strong></div>
+                <div className="text-center">
+                  <div className="text-sm mb-2 font-black uppercase">{viewingCert.serial_no}</div>
                   <img src={viewingCert.photo_url || PLACEHOLDER_PHOTO} className="w-24 h-28 border-2 border-black object-cover" alt="Candidate" />
-
                 </div>
-                
               </div>
 
               <div className="text-center text-xl font-black font-sans uppercase tracking-widest underline my-8">
@@ -485,19 +613,20 @@ export default function CertificateTabComponent({ studentsList = [] }: Certifica
               </div>
 
               <div className="text-sm leading-loose text-justify">
-                
-                This is to certify that <strong className="underline">{viewingCert.student_name}</strong> {viewingCert.des || 'S/O'} <strong className="underline">{viewingCert.father_name}</strong> has successfully completed the <strong className="underline">{viewingCert.course_name}</strong> conducted by <strong className="underline">{viewingCert.study_center || 'MITM Bilari'}</strong> during the period from <strong className="underline">{formatDate(viewingCert.start_date)}</strong> to <strong className="underline">{formatDate(viewingCert.end_date)}</strong>. The candidate has satisfied all requirements and has been awarded Grade <strong className="underline text-base">'{viewingCert.grade}'</strong>.
+                This is to certify that <strong className="underline">{viewingCert.student_name}</strong> {viewingCert.des || 'S/O'} <strong className="underline">{viewingCert.father_name}</strong> has successfully completed the <strong className="underline">{viewingCert.course_name}</strong> conducted by <strong className="underline">{viewingCert.study_center || 'Manavta Institute'}</strong> during the period from <strong className="underline">{formatDate(viewingCert.start_date)}</strong> to <strong className="underline">{formatDate(viewingCert.end_date)}</strong>. The candidate has satisfied all requirements and has been awarded Grade <strong className="underline text-base">'{viewingCert.grade}'</strong>.
               </div>
 
               <div className="flex justify-between items-end pt-12 font-sans">
+                <div className="text-center w-40">
+                  <div className="border-t-2 border-black pt-1 font-bold text-xs uppercase">Director</div>
+                </div>
                 <div className="text-center">
                   <img src={buildQrUrl(viewingCert, 110)} className="w-20 h-20 mx-auto" alt="QR Code" />
                   <div className="text-[9px] font-bold mt-1">SCAN TO VERIFY</div>
-                  <div className="text-xs font-bold mb-1 mt-2 ">Date of Issue: {formatDate(viewingCert.issue_date)}</div>
+                  <div className="text-xs font-bold mb-1 mt-2">Date of Issue: {formatDate(viewingCert.issue_date)}</div>
                 </div>
-                <div className="text-center">
-
-                  <div className="border-t-2 border-black w-40 pt-1 font-bold text-xs uppercase">Authorised Signatory</div>
+                <div className="text-center w-40">
+                  <div className="border-t-2 border-black pt-1 font-bold text-xs uppercase">Authorised Signatory</div>
                 </div>
               </div>
             </div>
@@ -506,7 +635,7 @@ export default function CertificateTabComponent({ studentsList = [] }: Certifica
               <button onClick={() => setViewingCert(null)} className="px-4 py-2 bg-slate-200 text-xs font-bold rounded-xl">Close</button>
               <button
                 onClick={() => {
-                  printCertificate(viewingCert, awardMatter);
+                  printCertificate(viewingCert, {});
                   setViewingCert(null);
                 }}
                 className="px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs rounded-xl shadow"
