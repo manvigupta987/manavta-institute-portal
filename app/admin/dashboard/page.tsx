@@ -952,7 +952,7 @@ window.onload = function() {
               <h1 className="text-lg font-black tracking-wide uppercase text-white">
                 MITM Admin Portal
               </h1>
-              <p className="text-xs text-amber-200 font-medium">
+              <p className="text-xs text-sky-200 font-medium">
                 Manavta Institute of Technology & Management
               </p>
             </div>
@@ -1880,15 +1880,15 @@ window.onload = function() {
       {/* 1. VIEW ID CARD MODAL (UPDATED LANDSCAPE AADHAR SIZE WITH 3 LOGOS) */}
       {viewingIdCardStudent && (
         <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 border border-slate-200">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5 border border-slate-200">
             <div className="flex items-center justify-between border-b pb-3">
-              <h3 className="font-bold text-slate-900 text-sm uppercase">👁️ ID Card Preview Modal (Aadhar Size Landscape)</h3>
+              <h3 className="font-bold text-slate-900 text-sm uppercase">👁️ ID Card Preview (Aadhar Size Landscape)</h3>
               <button onClick={() => setViewingIdCardStudent(null)} className="text-slate-400 hover:text-slate-600 font-bold text-lg">✕</button>
             </div>
 
             {/* ID CARD CONTAINER WITH LANDSCAPE AADHAR SIZE & 3 LOGOS */}
                         
-            <div className="p-3 bg-white rounded-xl border-2 border-slate-900 space-y-2 shadow-sm mx-auto" style={{ width: '320px', height: '200px' }}>
+            <div className="p-2 bg-white rounded-xl border-2 border-slate-900 space-y-1. shadow-sm mx-auto" style={{ width: '320px', height: '200px' }}>
               <div className="flex items-center justify-between border-b-2 border-sky-600 pb-1.5">
                 <img src="/logo.png" alt="Logo" className="h-6 object-contain" onError={(e: any) => e.target.style.display='none'} />
                 <img src="/logo2.png" alt="Manavta Institute" className="h-5 object-contain" onError={(e: any) => e.target.style.display='none'} />
@@ -1899,7 +1899,7 @@ window.onload = function() {
                 <img src={viewingIdCardStudent.photo_url || 'https://iili.io/3jruEzl.md.jpg'} alt="Student" className="w-14 h-16 object-cover rounded border border-black flex-shrink-0" />
                 <div className="text-[10px] leading-tight space-y-1 text-slate-800">
                   <div><span className="font-bold text-sky-700">NAME:</span> <strong className="uppercase">{viewingIdCardStudent.student_name}</strong></div>
-                  <div><span className="font-bold text-sky-700">FATHER:</span> {viewingIdCardStudent.father_name}</div>
+                  <div><span className="font-bold text-sky-700">FATHER'S NAME:</span> {viewingIdCardStudent.father_name}</div>
                   <div><span className="font-bold text-sky-700">ROLL NO:</span> <strong className="font-mono text-slate-900">{viewingIdCardStudent.roll_no}</strong></div>
                   <div><span className="font-bold text-sky-700">ENROLLMENT:</span> <span className="font-mono">{viewingIdCardStudent.enrollment_no}</span></div>
                   <div><span className="font-bold text-sky-700">COURSE:</span> {viewingIdCardStudent.course_name}</div>
@@ -1908,7 +1908,7 @@ window.onload = function() {
               </div>
 
               <div className="flex items-end justify-between border-t pt-1 text-[9px]">
-                <div className="truncate max-w-[170px]">
+                <div className="truncate max-w-[200px]">
                   <span className="text-slate-500 font-bold">Center:</span> <strong>{viewingIdCardStudent.study_center}</strong>
                 </div>
                 <div className="text-center">
