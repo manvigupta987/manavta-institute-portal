@@ -589,13 +589,16 @@ export default function CertificateTabComponent({ studentsList = [] }: Certifica
       {/* VIEW MODAL (black text, same as print) */}
       {viewingCert && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto text-black">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 space-y-5 shadow-2xl max-h-[90vh] overflow-y-auto text-black">
             <div className="flex justify-between items-center border-b pb-3">
               <h3 className="text-sm font-bold uppercase">📜 Certificate Preview</h3>
               <button onClick={() => setViewingCert(null)} className="text-slate-500 hover:text-slate-800 font-bold text-sm">✕ Close</button>
             </div>
 
-            <div className="bg-white border-2 border-black p-8 space-y-8 font-serif pt-[48mm]">
+            <div className="bg-white border-2 border-black p-8 space-y-8 font-serif pt-[40mm]">
+            <div className="text-center text-xl font-black font-sans uppercase tracking-widest underline my-8">
+                CERTIFICATE OF COMPLETION
+              </div>
               <div className="flex justify-between items-center font-sans text-xs">
                 <div className="space-y-2">
                   <div>Enrollment No: <strong>{viewingCert.enrollment_no}</strong></div>
@@ -608,15 +611,11 @@ export default function CertificateTabComponent({ studentsList = [] }: Certifica
                 </div>
               </div>
 
-              <div className="text-center text-xl font-black font-sans uppercase tracking-widest underline my-8">
-                CERTIFICATE OF COMPLETION
-              </div>
-
               <div className="text-sm leading-loose text-justify">
                 This is to certify that <strong className="underline">{viewingCert.student_name}</strong> {viewingCert.des || 'S/O'} <strong className="underline">{viewingCert.father_name}</strong> has successfully completed the <strong className="underline">{viewingCert.course_name}</strong> conducted by <strong className="underline">{viewingCert.study_center || 'Manavta Institute'}</strong> during the period from <strong className="underline">{formatDate(viewingCert.start_date)}</strong> to <strong className="underline">{formatDate(viewingCert.end_date)}</strong>. The candidate has satisfied all requirements and has been awarded Grade <strong className="underline text-base">'{viewingCert.grade}'</strong>.
               </div>
 
-              <div className="flex justify-between items-end pt-12 font-sans">
+              <div className="flex justify-between items-end pt-2 font-sans">
                 <div className="text-center w-40">
                   <div className="border-t-2 border-black pt-1 font-bold text-xs uppercase">Director</div>
                 </div>

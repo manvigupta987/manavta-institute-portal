@@ -93,7 +93,7 @@ export const printMarksheet = (m: PrintMarksheet, opts: PrintOptions = {}, exist
     return;
   }
 
-  const top = opts.topMarginMm ?? 48;
+  const top = opts.topMarginMm ?? 40;
   const n = m.subjects.length;
   // Fewer subjects => taller rows, so the sheet always fills the page
   const rowPad = n <= 4 ? 18 : n <= 6 ? 14 : n <= 8 ? 10 : 7;
@@ -123,7 +123,7 @@ export const printMarksheet = (m: PrintMarksheet, opts: PrintOptions = {}, exist
   body { 
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background: #fff; }
   .a4-page { 
-  width: 210mm; height: 296mm; margin: 0 auto; padding: ${top}mm 15mm 12mm 15mm; box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; }
+  width: 210mm; height: 290mm; margin: 0 auto; padding: ${top}mm 15mm 12mm 15mm; box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; }
   .inst-head { 
   text-align: center; font-size: 17px; font-weight: 900; letter-spacing: 1px; margin-bottom: 10px; }
   .doc-title { 
@@ -148,7 +148,7 @@ export const printMarksheet = (m: PrintMarksheet, opts: PrintOptions = {}, exist
   .bold { font-weight: 800; }
   .summary { display: flex; justify-content: space-between; align-items: center; border: 2px solid #000; padding: 14px 18px; font-weight: 800; font-size: 13.5px; }
   .spacer { flex: 1; }
-  .footer { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 20px; }
+  .footer { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 50px; }
   .sign-block { text-align: center; width: 170px; }
   .sign-img { height: 38px; object-fit: contain; margin-bottom: 4px; }
   .sign-title { font-size: 10px; font-weight: 800; text-transform: uppercase; border-top: 1.5px solid #000; padding-top: 4px; }
@@ -198,8 +198,6 @@ export const printMarksheet = (m: PrintMarksheet, opts: PrintOptions = {}, exist
     <div>PERCENTAGE: ${esc(m.percentage)}%</div>
     <div>FINAL GRADE: ${esc(m.grade)}</div>
   </div>
-
-  <div class="spacer"></div>
 
   <div class="footer">
     <div class="sign-block">
@@ -255,14 +253,14 @@ export const printCertificate = (
   body { font-family: 'Georgia', serif; margin: 0; padding: 0; background: #fff; }
   .a4-page { width: 210mm; height: 296mm; margin: 0 auto; padding: ${top}mm 20mm 16mm 20mm; box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; }
   .inst-head { text-align: center; font-family: sans-serif; font-size: 18px; font-weight: 900; letter-spacing: 1px; margin-bottom: 10px; }
-  .top-meta { display: flex; justify-content: space-between; align-items: center; font-family: sans-serif; font-size: 20px; line-height: 1.9; }
+  .top-meta { display: flex; justify-content: space-between; align-items: center; font-family: sans-serif; font-size: 20px; line-height: 1.9; padding-bottom:25px;}
   .doc-no { font-weight: 900; font-size: 15px; text-align: center; text-transform: uppercase; margin-bottom: 6px; }
   .cert-photo { width: 110px; height: 135px; border: 2px solid #000; object-fit: cover; }
-  .middle { flex: 1; display: flex; flex-direction: column; justify-content: space-around; padding: 10px 0; }
-  .cert-title { text-align: center; font-size: 32px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; font-family: sans-serif; text-decoration: underline; }
+  .middle { display: flex; flex-direction: column; justify-content: space-around; padding: 10px 0; padding-top:25px; }
+  .cert-title { text-align: center; font-size: 32px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; font-family: sans-serif; text-decoration: underline; padding-bottom:30px;}
   .body-text { font-size: 19px; line-height: 2.7; text-align: justify; padding: 0 8px; }
   .body-text strong { text-decoration: underline; font-weight: 900; }
-  .footer { display: flex; justify-content: space-between; align-items: flex-end; font-family: sans-serif; }
+  .footer { display: flex; justify-content: space-between; align-items: flex-end; font-family: sans-serif;  padding-top:25px;}
   .sign-block { text-align: center; width: 190px; }
   .sign-img { height: 38px; object-fit: contain; margin-bottom: 4px; }
   .sign-title { font-size: 11px; font-weight: 800; text-transform: uppercase; border-top: 2px solid #000; padding-top: 4px; }
@@ -272,7 +270,9 @@ export const printCertificate = (
 <body>
 <div class="a4-page">
   ${headerHtml(opts.showHeader)}
+  <div class="cert-title">CERTIFICATE OF COMPLETION</div>
   <div class="top-meta">
+   
     <div class="font-size:28px;">
       <div>Enrollment No: <strong>${esc(c.enrollment_no)}</strong></div>
       <div>Roll No: <strong>${esc(c.roll_no)}</strong></div>
@@ -285,7 +285,6 @@ export const printCertificate = (
   </div>
 
   <div class="middle">
-    <div class="cert-title">CERTIFICATE OF COMPLETION</div>
     <div class="body-text">
       This is to certify that <strong>${esc(c.student_name)}</strong> ${esc(c.des || 'S/O')} <strong>${esc(c.father_name)}</strong> has successfully completed the <strong>${esc(c.course_name)}</strong> conducted by <strong>${esc(c.study_center || 'Manavta Institute')}</strong> during the period from <strong>${esc(formatDate(c.start_date))}</strong> to <strong>${esc(formatDate(c.end_date))}</strong>. The candidate has satisfied all requirements and has been awarded Grade <strong style="font-size:22px;">'${esc(c.grade)}'</strong>.
     </div>

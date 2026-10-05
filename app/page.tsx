@@ -30,9 +30,11 @@ function AnimatedCounter({ target, duration = 1500 }: { target: number; duration
 
 export default function HomePage() {
   const images = [
-    "/boy.jpeg",
-    "/boy.jpeg",
-    "/boy.jpeg",
+    "/office.jpeg",
+    "/class1.jpeg",
+    "/class2.jpeg",
+    "/lab1.jpeg",
+    "/reception.jpeg",
   ];
 
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -167,7 +169,7 @@ export default function HomePage() {
       <CourseList />
 
       {/* 🖼️ SECTION 5: ACCREDITATION / INFINITE GALLERY */}
-      <div className="mt-12 mb-12 mx-auto text-center">
+      <div className=" mb-12 mx-auto text-center">
         <h2 className="font-bold text-3xl md:text-4xl text-[#2B211D]">We are Accredited In ✅</h2>
       </div>
       <InfiniteMarquee />
