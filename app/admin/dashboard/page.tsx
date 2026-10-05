@@ -6,6 +6,7 @@ import { text } from 'stream/consumers';
 import { supabase } from '@/lib/supabase';
 import MarksheetTab from '@/components/MarksheetTab';
 import CertificateTab from '@/components/CertificateTab';
+import GalleryTabComponent from '@/components/GalleryTab';
 
 // ============================================================================
 // DATA INTERFACES
@@ -89,7 +90,7 @@ export default function MITMAdminMasterDashboard() {
   }, []);
 
   // Active Main Tab (6 Tabs)
-  const [activeTab, setActiveTab] = useState<'branches' | 'queue' | 'students' | 'idcards' | 'marksheets' | 'certificates'>('branches');
+  const [activeTab, setActiveTab] = useState<'branches' | 'queue' | 'students' | 'idcards' | 'marksheets' | 'certificates'|'gallery'>('branches');
 
   // Pre-printed Letterhead Toggle
   const [isLetterhead, setIsLetterhead] = useState(false);
@@ -1028,7 +1029,14 @@ window.onload = function() {
             >
               <span>📜</span> Tab 6: Student Certificate
             </button>
-
+            <button
+              onClick={() => setActiveTab('gallery')}
+              className={`px-4 py-2 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                activeTab === 'gallery' ? 'bg-sky-600 text-white shadow' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+              }`}
+            >
+              <span>🖼️</span> Tab 7: Update Gallery
+            </button>
           </div>
         </div>
       </header>
@@ -1873,6 +1881,8 @@ window.onload = function() {
 
         {/* TAB 6: STUDENT CERTIFICATE (data saved in Supabase `certificates`) */}
         {activeTab === 'certificates' && <CertificateTab studentsList={studentsList} />}
+        {/* TAB 7: GALLERY (photos & videos saved in Supabase Storage + `gallery` table) */}
+        {activeTab === 'gallery' && <GalleryTabComponent />}
       </main>
 
       {/* MODALS */}

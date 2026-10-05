@@ -10,7 +10,7 @@ type Role = 'admin' | 'branch' | null;
 // One list for links -> desktop and mobile always stay in sync (no more 404 mismatches)
 const ABOUT_LINKS = [
   { href: '/about/institute', label: '🏛️ About Institute', short: 'About Institute' },
-  { href: '/about/director-message', label: '👨‍💼 Director Message', short: 'Director Message' },
+  { href: '/about/message', label: '👨‍💼 Director Message', short: 'Director Message' },
   { href: '/about/vision-mission', label: '🎯 Vision & Mission', short: 'Vision & Mission' },
   { href: '/about/aims-objectives', label: '🚀 Aims and Objectives', short: 'Aims & Objectives' },
 ];

@@ -1,26 +1,53 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #FAF7F2;
+  --foreground: #2B211D;
+
+  /* Brand palette — Maroon + Ivory (footer stays its own dark navy/slate, untouched) */
+  --brand-maroon: #6B1F2A;
+  --brand-maroon-dark: #4E151D;
+  --brand-gold: #B08D57;
+  --brand-gold-light: #D8BD8E;
+  --brand-ivory: #FAF7F2;
+  --brand-ivory-soft: #F2ECE1;
+  --brand-text: #2B211D;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-brand-maroon: var(--brand-maroon);
+  --color-brand-maroon-dark: var(--brand-maroon-dark);
+  --color-brand-gold: var(--brand-gold);
+  --color-brand-gold-light: var(--brand-gold-light);
+  --color-brand-ivory: var(--brand-ivory);
+  --color-brand-ivory-soft: var(--brand-ivory-soft);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Flip-card utility used by the course flashcards */
+.flip-card-perspective {
+  perspective: 1200px;
+}
+.flip-card-inner {
+  transition: transform 0.6s;
+  transform-style: preserve-3d;
+}
+.flip-card-inner.is-flipped {
+  transform: rotateY(180deg);
+}
+.flip-card-face {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.flip-card-back {
+  transform: rotateY(180deg);
 }
