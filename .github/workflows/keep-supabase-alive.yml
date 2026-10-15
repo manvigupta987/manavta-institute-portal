@@ -11,4 +11,17 @@ jobs:
     steps:
       - name: Ping Supabase REST API
         run: |
-          curl -s -f -X GET "${{ secrets.SUPABASE_URL }}/rest/v1/" -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}"
+          URL="${{ secrets.SUPABASE_URL }}"
+          URL="${URL%/}"
+          echo "Pinging $URL/rest/v1/ ..."
+          response=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X GET "$URL/rest/v1/" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}")
+          echo "$response"
+          if [[ "$response" == *"HTTP_STATUS:200"* ]]; then
+            echo "Successfully pinged Supabase!"
+            exit 0
+          else
+            echo "Failed to ping Supabase! Check your SUPABASE_URL and SUPABASE_ANON_KEY secrets in GitHub."
+            exit 1
+          fi
