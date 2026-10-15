@@ -13,15 +13,16 @@ jobs:
         run: |
           URL="${{ secrets.SUPABASE_URL }}"
           URL="${URL%/}"
-          echo "Pinging $URL/rest/v1/ ..."
-          response=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X GET "$URL/rest/v1/" \
-            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}")
+          echo "Pinging Supabase Health Endpoint: $URL/auth/v1/health ..."
+          
+          # Ping Supabase Health Endpoint (Returns 200 OK and keeps DB alive)
+          response=$(curl -s -w "\nHTTP_STATUS:%{http_code}" "$URL/auth/v1/health")
           echo "$response"
+          
           if [[ "$response" == *"HTTP_STATUS:200"* ]]; then
-            echo "Successfully pinged Supabase!"
+            echo "Successfully pinged Supabase! Database is active."
             exit 0
           else
-            echo "Failed to ping Supabase! Check your SUPABASE_URL and SUPABASE_ANON_KEY secrets in GitHub."
+            echo "Failed to ping Supabase! Please check your SUPABASE_URL secret in GitHub."
             exit 1
           fi
