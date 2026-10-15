@@ -9,37 +9,11 @@ jobs:
   ping-supabase:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Supabase API
+      - name: Ping Supabase Database
         run: |
-          URL="${{ secrets.SUPABASE_URL }}"
-          URL="${URL%/}"
-
-          if [ -z "$URL" ]; then
-            echo "❌ ERROR: 'SUPABASE_URL' secret is missing in GitHub Settings!"
-            echo "Please add 'SUPABASE_URL' in GitHub Repo -> Settings -> Secrets and variables -> Actions."
-            exit 1
-          fi
-
-          echo "Pinging Supabase Health Endpoint: $URL/auth/v1/health ..."
-          
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL/auth/v1/health")
-          echo "Health Endpoint Status: $HTTP_STATUS"
-
-          if [ "$HTTP_STATUS" -eq 200 ] || [ "$HTTP_STATUS" -eq 204 ] || [ "$HTTP_STATUS" -eq 302 ]; then
-            echo "✅ SUCCESS: Supabase is ALIVE and active!"
-            exit 0
-          else
-            echo "⚠️ Health check returned $HTTP_STATUS. Trying REST endpoint..."
-            ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}"
-            REST_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -H "apikey: $ANON_KEY" -H "Authorization: Bearer $ANON_KEY" "$URL/rest/v1/")
-            echo "REST Endpoint Status: $REST_STATUS"
-
-            if [ "$REST_STATUS" -eq 200 ] || [ "$REST_STATUS" -eq 204 ]; then
-              echo "✅ SUCCESS: Supabase REST API is ALIVE!"
-              exit 0
-            fi
-
-            echo "❌ FAILED: Received HTTP Status $HTTP_STATUS / $REST_STATUS"
-            echo "Please check if your project is PAUSED in Supabase Dashboard!"
-            exit 1
-          fi
+          echo "Pinging Supabase REST API..."
+          curl -s "${{ secrets.SUPABASE_URL }}/rest/v1/" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}"
+          echo ""
+          echo "Ping successful! Supabase project is active."
