@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { printIdentityCard } from '@/lib/print-templates';
 
-const PLACEHOLDER_PHOTO = 'https://iili.io/3jruEzl.md.jpg';
+const PLACEHOLDER_PHOTO = '';
 
 interface StudentHit {
   id: string;
@@ -24,7 +24,7 @@ const SELECT_COLS = 'id,roll_no,enrollment_no,student_name,father_name,course_na
 
 export default function VerifyRegistrationPage() {
   const [nameInput, setNameInput] = useState('');
-  const [dobInput, setDobInput] = useState('');
+  const [enrollInput, setEnrollInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [searched, setSearched] = useState(false);
@@ -35,11 +35,11 @@ export default function VerifyRegistrationPage() {
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     const name = nameInput.trim();
-    const dob = dobInput.trim();
+    const enroll_no = enrollInput.trim();
 
     // Both fields are mandatory
-    if (!name || !dob) {
-      setErrorMsg('Both Student Name and Date of Birth are required.');
+    if (!name || !enroll_no) {
+      setErrorMsg('Both Student Name and Enrollment No are required.');
       return;
     }
 
@@ -57,14 +57,14 @@ export default function VerifyRegistrationPage() {
         .from('students')
         .select(SELECT_COLS)
         .eq('status', 'APPROVED')
-        .eq('dob', dob)
+        .eq('enrollment_no', enroll_no)
         .ilike('student_name', `${name}%`)
         .limit(20);
 
       if (error) throw error;
 
       if (!data || data.length === 0) {
-        setErrorMsg('No matching student record found. Please check Name & Date of Birth.');
+        setErrorMsg('No matching student record found. Please check Name & Enrollment No.');
       } else if (data.length === 1) {
         setSelected(data[0] as StudentHit);
       } else {
@@ -91,7 +91,7 @@ export default function VerifyRegistrationPage() {
             🎓 Student Verification & ID Card
           </h1>
           <p className="text-xs text-slate-500">
-            Enter Student Name (e.g. first name is enough) and Date of Birth to verify identity and download the ID card.
+            Enter Student Name (e.g. first name is enough) and Enrollment No to verify identity and download the ID card.
           </p>
         </div>
 
@@ -112,12 +112,12 @@ export default function VerifyRegistrationPage() {
             </div>
             <div>
               <label className="block font-bold text-slate-700 uppercase mb-1">
-                Date of Birth *
+                Enrollment No *
               </label>
               <input
-                type="date"
-                value={dobInput}
-                onChange={(e) => setDobInput(e.target.value)}
+                type="number"
+                value={enrollInput}
+                onChange={(e) => setEnrollInput(e.target.value)}
                 className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 font-medium"
                 required
               />
@@ -197,7 +197,7 @@ export default function VerifyRegistrationPage() {
                     <div><span className="font-bold">Study Center:</span> {selected.study_center}</div>
                   </div>
                   <img
-                    src={selected.photo_url || PLACEHOLDER_PHOTO}
+                    src={selected.photo_url}
                     alt={selected.student_name}
                     className="w-20 h-24 border border-slate-300 rounded-md object-cover flex-shrink-0 bg-slate-50"
                   />

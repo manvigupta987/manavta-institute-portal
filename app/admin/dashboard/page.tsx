@@ -127,7 +127,7 @@ export default function MITMAdminMasterDashboard() {
     aadhar_no: s.aadhar_no || '',
     photo_url: s.photo_url || '',
     address: s.address || '',
-    study_center: s.study_center || 'Manavta Institute Of Technology & Management',
+    study_center: s.study_center || 'Manavta Institute',
     status: s.status === 'APPROVED' ? 'APPROVED' : 'PENDING_APPROVAL',
     branch_code: s.branch_code || ''
   });
@@ -220,7 +220,7 @@ export default function MITMAdminMasterDashboard() {
     aadhar_no: '',
     photo_url: '',
     address: '',
-    study_center: 'Manavta Institute Of Technology & Management'
+    study_center: 'Manavta Institute '
   });
   const [editingStudent, setEditingStudent] = useState<StudentRecord | null>(null);
 
@@ -954,7 +954,7 @@ window.onload = function() {
                 MITM Admin Portal
               </h1>
               <p className="text-xs text-sky-200 font-medium">
-                Manavta Institute of Technology & Management
+                Manavta Institute
               </p>
             </div>
           </div>
