@@ -125,9 +125,9 @@ export default function MITMAdminMasterDashboard() {
     mobile_no: s.mobile_no || '',
     alt_mobile_no: s.alt_mobile_no || '',
     aadhar_no: s.aadhar_no || '',
-    photo_url: s.photo_url || 'https://iili.io/3jruEzl.md.jpg',
+    photo_url: s.photo_url || '',
     address: s.address || '',
-    study_center: s.study_center || 'MITM',
+    study_center: s.study_center || 'Manavta Institute Of Technology & Management',
     status: s.status === 'APPROVED' ? 'APPROVED' : 'PENDING_APPROVAL',
     branch_code: s.branch_code || ''
   });
@@ -161,7 +161,7 @@ export default function MITMAdminMasterDashboard() {
           head_name: b.head_name || '',
           head_qualification: b.head_qualification || '',
           head_aadhar_no: b.head_aadhar_no || '',
-          head_photo_url: b.head_photo_url || 'https://iili.io/3jruEzl.md.jpg',
+          head_photo_url: b.head_photo_url || '',
           created_at: b.created_at ? String(b.created_at).split('T')[0] : ''
         }))
       );
@@ -209,7 +209,7 @@ export default function MITMAdminMasterDashboard() {
     serial_no: '', // Document No
     course_name: 'Advance Diploma In Computer Software',
     admission_date: new Date().toISOString().split('T')[0],
-    session: '2025-2027',
+    session: '',
     student_name: '',
     father_name: '',
     mother_name: '',
@@ -218,9 +218,9 @@ export default function MITMAdminMasterDashboard() {
     mobile_no: '',
     alt_mobile_no: '',
     aadhar_no: '',
-    photo_url: 'https://iili.io/3jruEzl.md.jpg',
+    photo_url: '',
     address: '',
-    study_center: 'Manavta Institute'
+    study_center: 'Manavta Institute Of Technology & Management'
   });
   const [editingStudent, setEditingStudent] = useState<StudentRecord | null>(null);
 
@@ -300,7 +300,7 @@ export default function MITMAdminMasterDashboard() {
       head_name: newBranch.head_name.trim(),
       head_qualification: newBranch.head_qualification.trim(),
       head_aadhar_no: newBranch.head_aadhar_no.trim(),
-      head_photo_url: newBranch.head_photo_url || 'https://iili.io/3jruEzl.md.jpg',
+      head_photo_url: newBranch.head_photo_url || '',
     };
 
     const { data, error } = await supabase
@@ -537,7 +537,7 @@ export default function MITMAdminMasterDashboard() {
       mobile_no: newStudentForm.mobile_no.trim(),
       alt_mobile_no: newStudentForm.alt_mobile_no.trim(),
       aadhar_no: newStudentForm.aadhar_no.trim(),
-      photo_url: newStudentForm.photo_url || 'https://iili.io/3jruEzl.md.jpg',
+      photo_url: newStudentForm.photo_url || '',
       address: newStudentForm.address.trim(),
       study_center: newStudentForm.study_center,
       status: 'APPROVED',
@@ -575,7 +575,7 @@ export default function MITMAdminMasterDashboard() {
       mobile_no: '',
       alt_mobile_no: '',
       aadhar_no: '',
-      photo_url: 'https://iili.io/3jruEzl.md.jpg',
+      photo_url: '',
       address: '',
       study_center: 'Manavta Institute'
     });
@@ -840,7 +840,7 @@ body {
 
     <div class="card-body">
       <div class="photo-box">
-        <img src="${student.photo_url || 'https://iili.io/3jruEzl.md.jpg'}" alt="Photo" />
+        <img src="${student.photo_url || ' '}" alt="Photo" />
       </div>
       <div class="details-box">
       <div><span class="label">Roll No:</span> <strong style="color:#0f172a;">${student.roll_no}</strong></div>
@@ -1213,7 +1213,7 @@ window.onload = function() {
                         <td className="p-3 font-bold text-slate-900">{branch.institute_name}</td>
                         <td className="p-3">
                           <div className="flex items-center gap-2">
-                            <img src={branch.head_photo_url || 'https://iili.io/3jruEzl.md.jpg'} alt="Head" className="w-8 h-8 rounded-full object-cover border border-slate-300" />
+                            <img src={branch.head_photo_url || ' '} alt="Head" className="w-8 h-8 rounded-full object-cover border border-slate-300" />
                             <div>
                               <div className="font-bold">{branch.head_name || 'N/A'}</div>
                               <div className="text-[10px] text-slate-500">{branch.head_qualification}</div>
@@ -1717,7 +1717,7 @@ window.onload = function() {
                         <td className="p-3 font-mono text-slate-500">{s.alt_mobile_no || '-'}</td>
                         <td className="p-3 font-mono font-bold text-amber-900">{s.aadhar_no}</td>
                         <td className="p-3">
-                          <img src={s.photo_url || 'https://iili.io/3jruEzl.md.jpg'} alt="Photo" className="w-8 h-8 rounded object-cover border border-slate-300" />
+                          <img src={s.photo_url || ' '} alt="Photo" className="w-8 h-8 rounded object-cover border border-slate-300" />
                         </td>
                         <td className="p-3 text-slate-600 max-w-xs truncate">{s.address}</td>
                         <td className="p-3 text-slate-600 max-w-xs truncate">{s.study_center}</td>
@@ -1841,7 +1841,7 @@ window.onload = function() {
                       <td className="p-3 font-medium uppercase">{s.father_name}</td>
                       <td className="p-3 font-medium">{s.course_name}</td>
                       <td className="p-3">
-                        <img src={s.photo_url || 'https://iili.io/3jruEzl.md.jpg'} alt="Photo" className="w-8 h-8 rounded object-cover border border-slate-300" />
+                        <img src={s.photo_url || ' '} alt="Photo" className="w-8 h-8 rounded object-cover border border-slate-300" />
                       </td>
                       <td className="p-3 text-slate-600 max-w-xs truncate">{s.study_center}</td>
                       <td className="p-3 text-center">
@@ -1906,7 +1906,7 @@ window.onload = function() {
               </div>
 
               <div className="flex items-start gap-2.5 pt-1">
-                <img src={viewingIdCardStudent.photo_url || 'https://iili.io/3jruEzl.md.jpg'} alt="Student" className="w-14 h-16 object-cover rounded border border-black flex-shrink-0" />
+                <img src={viewingIdCardStudent.photo_url || ' '} alt="Student" className="w-14 h-16 object-cover rounded border border-black flex-shrink-0" />
                 <div className="text-[10px] leading-tight space-y-1 text-slate-800">
                   <div><span className="font-bold text-sky-700">NAME:</span> <strong className="uppercase">{viewingIdCardStudent.student_name}</strong></div>
                   <div><span className="font-bold text-sky-700">FATHER'S NAME:</span> {viewingIdCardStudent.father_name}</div>

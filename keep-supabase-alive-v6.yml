@@ -1,0 +1,28 @@
+name: Keep Supabase Alive
+
+on:
+  schedule:
+    - cron: '0 0 */2 * *'
+  workflow_dispatch:
+
+jobs:
+  ping-supabase:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST API
+        run: |
+          URL="${{ secrets.SUPABASE_URL }}"
+          URL="${URL%/}"
+          echo "Pinging Supabase Health Endpoint: $URL/auth/v1/health ..."
+          
+          # Ping Supabase Health Endpoint (Returns 200 OK and keeps DB alive)
+          response=$(curl -s -w "\nHTTP_STATUS:%{http_code}" "$URL/auth/v1/health")
+          echo "$response"
+          
+          if [[ "$response" == *"HTTP_STATUS:200"* ]]; then
+            echo "Successfully pinged Supabase! Database is active."
+            exit 0
+          else
+            echo "Failed to ping Supabase! Please check your SUPABASE_URL secret in GitHub."
+            exit 1
+          fi
