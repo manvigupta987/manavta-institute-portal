@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 import MarksheetTab from '@/components/MarksheetTab';
 import CertificateTab from '@/components/CertificateTab';
 import GalleryTabComponent from '@/components/GalleryTab';
+import CoursesTabComponent from '@/components/CourseTab';
 
 // ============================================================================
 // DATA INTERFACES
@@ -90,7 +91,7 @@ export default function MITMAdminMasterDashboard() {
   }, []);
 
   // Active Main Tab (6 Tabs)
-  const [activeTab, setActiveTab] = useState<'branches' | 'queue' | 'students' | 'idcards' | 'marksheets' | 'certificates'|'gallery'>('branches');
+  const [activeTab, setActiveTab] = useState<'branches' | 'queue' | 'students' | 'idcards' | 'marksheets' | 'certificates'|'gallery' | 'courses '>('branches');
 
   // Pre-printed Letterhead Toggle
   const [isLetterhead, setIsLetterhead] = useState(false);
@@ -251,7 +252,7 @@ export default function MITMAdminMasterDashboard() {
   const [assignRoll, setAssignRoll] = useState('');
   const [assignEnrollment, setAssignEnrollment] = useState('');
 
-  // PHOTO UPLOAD VALIDATION HANDLER (JPG/PNG <= 200KB)
+  // PHOTO UPLOAD VALIDATION HANDLER (JPG/PNG <= 20KB)
   const handlePhotoUpload = (
     e: React.ChangeEvent<HTMLInputElement>,
     onSuccess: (base64Url: string) => void
@@ -266,9 +267,9 @@ export default function MITMAdminMasterDashboard() {
       return;
     }
 
-    const maxSizeBytes = 200 * 1024;
+    const maxSizeBytes = 20 * 1024;
     if (file.size > maxSizeBytes) {
-      alert(`❌ Photo size exceeds 200KB limit! (Selected file size: ${(file.size / 1024).toFixed(1)}KB)`);
+      alert(`❌ Photo size exceeds 20KB limit! (Selected file size: ${(file.size / 1024).toFixed(1)}KB)`);
       e.target.value = '';
       return;
     }
@@ -1037,6 +1038,7 @@ window.onload = function() {
             >
               <span>🖼️</span> Tab 7: Update Gallery
             </button>
+            
           </div>
         </div>
       </header>
@@ -1149,7 +1151,7 @@ window.onload = function() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Head Photo (JPG/PNG &lt;= 200KB)</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Head Photo (JPG/PNG &lt;= 20KB)</label>
                     <input
                       type="file"
                       accept="image/jpeg,image/jpg,image/png"
@@ -1575,7 +1577,7 @@ window.onload = function() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Upload Photo (JPG/PNG &lt;= 200KB) *</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Upload Photo (JPG/PNG &lt;= 20KB) *</label>
                     <input
                       type="file"
                       required
@@ -1883,6 +1885,8 @@ window.onload = function() {
         {activeTab === 'certificates' && <CertificateTab studentsList={studentsList} />}
         {/* TAB 7: GALLERY (photos & videos saved in Supabase Storage + `gallery` table) */}
         {activeTab === 'gallery' && <GalleryTabComponent />}
+        {/* TAB 7: GALLERY (photos & videos saved in Supabase Storage + `gallery` table) */}
+        
       </main>
 
       {/* MODALS */}
@@ -1898,7 +1902,7 @@ window.onload = function() {
 
             {/* ID CARD CONTAINER WITH LANDSCAPE AADHAR SIZE & 3 LOGOS */}
                         
-            <div className="p-2 bg-white rounded-xl border-2 border-slate-900 space-y-1. shadow-sm mx-auto" style={{ width: '320px', height: '200px' }}>
+            <div className="p-2 bg-white rounded-xl border-2 border-slate-900 space-y-1. shadow-sm mx-auto" style={{ width: '320px', height: '20px' }}>
               <div className="flex items-center justify-between border-b-2 border-sky-600 pb-1.5">
                 <img src="/logo.png" alt="Logo" className="h-6 object-contain" onError={(e: any) => e.target.style.display='none'} />
                 <img src="/logo2.png" alt="Manavta Institute" className="h-5 object-contain" onError={(e: any) => e.target.style.display='none'} />
@@ -1918,7 +1922,7 @@ window.onload = function() {
               </div>
 
               <div className="flex items-end justify-between border-t pt-1 text-[9px]">
-                <div className="truncate max-w-[200px]">
+                <div className="truncate max-w-[20px]">
                   <span className="text-slate-500 font-bold">Center:</span> <strong>{viewingIdCardStudent.study_center}</strong>
                 </div>
                 <div className="text-center">

@@ -9,7 +9,7 @@ import React, { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { printResultCard } from '@/lib/print-templates';
 
-const PLACEHOLDER_PHOTO = 'https://iili.io/3jruEzl.md.jpg';
+const PLACEHOLDER_PHOTO = '';
 
 interface StudentHit {
   id: string;
