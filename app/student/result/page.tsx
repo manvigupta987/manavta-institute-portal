@@ -5,10 +5,10 @@
 // IMPORTANT: Students can ONLY ever see Grade + Pass/Fail here. No percentage,
 // no subject-wise marks, no certificate access. The Marksheet and Certificate
 // stay strictly inside the Admin Dashboard.
+
 import React, { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { printResultCard } from '@/lib/print-templates';
-
 
 interface StudentHit {
   id: string;
@@ -19,6 +19,7 @@ interface StudentHit {
   course_name: string;
   study_center: string;
   photo_url?: string;
+  grade?: string;
 }
 
 interface ResultView {
@@ -33,9 +34,8 @@ interface ResultView {
   result: 'PASS' | 'FAIL';
 }
 
-const STUDENT_COLS = 'id,roll_no,enrollment_no,student_name,father_name,course_name,study_center,photo_url';
-const MARKSHEET_COLS = 'grade';
-const CERTIFICATE_COLS = 'grade';
+const MARKSHEET_COLS = 'id,roll_no,enrollment_no,student_name,father_name,course_name,study_center,photo_url,grade';
+const CERTIFICATE_COLS = 'id,roll_no,enrollment_no,student_name,father_name,course_name,study_center,photo_url,grade';
 
 export default function CheckResultPage() {
   const [nameInput, setNameInput] = useState('');
@@ -48,37 +48,39 @@ export default function CheckResultPage() {
   const [result, setResult] = useState<ResultView | null>(null);
 
   const loadResultFor = async (student: StudentHit) => {
-    const { data: msRows, error: msErr } = await supabase
-      .from('marksheets')
-      .select(MARKSHEET_COLS)
-      .eq('roll_no', student.roll_no)
-      .eq('enrollment_no', student.enrollment_no)
-      .limit(1);
+    let grade: string | null = student.grade || null;
 
-    if (msErr) {
-      setErrorMsg('Error connecting to database. Please try again.');
-      return;
-    }
-
-    let grade: string | null = null;
-
-    if (msRows && msRows.length > 0) {
-      grade = String(msRows[0].grade || '').toUpperCase();
-    } else {
-      const { data: certRows, error: certErr } = await supabase
-        .from('certificates')
-        .select(CERTIFICATE_COLS)
+    if (!grade) {
+      const { data: msRows, error: msErr } = await supabase
+        .from('marksheets')
+        .select('grade')
         .eq('roll_no', student.roll_no)
         .eq('enrollment_no', student.enrollment_no)
         .limit(1);
 
-      if (certErr) {
+      if (msErr) {
         setErrorMsg('Error connecting to database. Please try again.');
         return;
       }
 
-      if (certRows && certRows.length > 0) {
-        grade = String(certRows[0].grade || '').toUpperCase();
+      if (msRows && msRows.length > 0) {
+        grade = String(msRows[0].grade || '').toUpperCase();
+      } else {
+        const { data: certRows, error: certErr } = await supabase
+          .from('certificates')
+          .select('grade')
+          .eq('roll_no', student.roll_no)
+          .eq('enrollment_no', student.enrollment_no)
+          .limit(1);
+
+        if (certErr) {
+          setErrorMsg('Error connecting to database. Please try again.');
+          return;
+        }
+
+        if (certRows && certRows.length > 0) {
+          grade = String(certRows[0].grade || '').toUpperCase();
+        }
       }
     }
 
@@ -118,17 +120,29 @@ export default function CheckResultPage() {
     setSearched(true);
 
     try {
-      // Name match is "starts with" (so "manvi" or "manvi gupta" matches
-      // "MANVI GUPTA", but a surname-only search like "gupta" will not).
-      const { data, error } = await supabase
-        .from('students')
-        .select(STUDENT_COLS)
-        .eq('status', 'APPROVED')
+      // Name match is "starts with" (so "manvi" or "manvi gupta" matches "MANVI GUPTA", but a surname-only search like "gupta" will not).
+      // Direct query to marksheets table first (skipping students table)
+      let { data, error } = await supabase
+        .from('marksheets')
+        .select(MARKSHEET_COLS)
         .eq('roll_no', roll)
         .ilike('student_name', `${name}%`)
         .limit(5);
 
       if (error) throw error;
+
+      // If no match found in marksheets, query certificates table directly
+      if (!data || data.length === 0) {
+        const { data: certData, error: certErr } = await supabase
+          .from('certificates')
+          .select(CERTIFICATE_COLS)
+          .eq('roll_no', roll)
+          .ilike('student_name', `${name}%`)
+          .limit(5);
+
+        if (certErr) throw certErr;
+        data = certData;
+      }
 
       if (!data || data.length === 0) {
         setErrorMsg('No matching student found. Please check Name & Roll Number.');
@@ -161,7 +175,7 @@ export default function CheckResultPage() {
     <div className="min-h-screen bg-slate-50 text-slate-900 py-10 px-4 font-sans flex flex-col items-center">
       <div className="w-full max-w-2xl space-y-6">
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 text-center space-y-2">
-          <h1 className="text-xl sm:text-2xl font-black uppercase tracking-wide">📊 Check Your Result</h1>
+          <h1 className="text-xl sm:text-2xl font-black uppercase tracking-wide">🎓 Check Your Result</h1>
           <p className="text-xs text-slate-500">
             Enter your Name and Roll Number to view your result.
           </p>
@@ -242,7 +256,7 @@ export default function CheckResultPage() {
           <div className="bg-white p-6 rounded-2xl shadow-md border border-slate-200 space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
               <span className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
-                <span>📊</span> Result Summary
+                <span>🎓</span> Result Summary
               </span>
               <span
                 className={`text-[11px] font-black uppercase px-2.5 py-1 rounded-md border ${
@@ -258,9 +272,24 @@ export default function CheckResultPage() {
             <div className="flex justify-center py-4 bg-slate-100 rounded-xl border border-slate-200">
               <div className="w-full max-w-md bg-white border-2 border-slate-900 rounded-xl p-5 shadow-lg space-y-4">
                 <div className="flex items-center justify-between gap-3 border-b-2 border-slate-900 pb-2">
-                  <img src="/logo.png" alt="Logo" className="h-10 object-contain" onError={(e: any) => (e.target.style.display = 'none')} />
-                  <img src="/logo2.png" alt="Manavta Institute" className="h-7 object-contain flex-1" onError={(e: any) => (e.target.style.display = 'none')} />
-                  <img src="/site.jpg" alt="Badge" className="h-9 object-contain" onError={(e: any) => (e.target.style.display = 'none')} />
+                  <img
+                    src="/logo.png"
+                    alt="Logo"
+                    className="h-10 object-contain"
+                    onError={(e: any) => (e.target.style.display = 'none')}
+                  />
+                  <img
+                    src="/logo2.png"
+                    alt="Manavta Institute"
+                    className="h-7 object-contain flex-1"
+                    onError={(e: any) => (e.target.style.display = 'none')}
+                  />
+                  <img
+                    src="/site.jpg"
+                    alt="Badge"
+                    className="h-9 object-contain"
+                    onError={(e: any) => (e.target.style.display = 'none')}
+                  />
                 </div>
 
                 <div className="flex items-start gap-4">
@@ -275,7 +304,7 @@ export default function CheckResultPage() {
                     <div><span className="font-bold">Study Center:</span> {result.study_center}</div>
                   </div>
                   <img
-                    src={result.photo_url }
+                    src={result.photo_url}
                     alt={result.student_name}
                     className="w-20 h-24 border border-slate-300 rounded-md object-cover flex-shrink-0 bg-slate-50"
                   />
