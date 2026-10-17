@@ -55,7 +55,7 @@ interface MarksheetTabProps {
   setIsLetterhead?: (val: boolean) => void;
 }
 
-const PLACEHOLDER_PHOTO = 'https://iili.io/3jruEzl.md.jpg';
+const PLACEHOLDER_PHOTO = '';
 
 // Everything EXCEPT photo_url -> list loads very fast
 const LIST_COLS =
