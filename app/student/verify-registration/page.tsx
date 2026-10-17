@@ -5,7 +5,6 @@ import React, { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { printIdentityCard } from '@/lib/print-templates';
 
-const PLACEHOLDER_PHOTO = '';
 
 interface StudentHit {
   id: string;

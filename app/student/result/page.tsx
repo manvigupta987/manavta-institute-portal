@@ -9,7 +9,6 @@ import React, { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { printResultCard } from '@/lib/print-templates';
 
-const PLACEHOLDER_PHOTO = '';
 
 interface StudentHit {
   id: string;
@@ -276,7 +275,7 @@ export default function CheckResultPage() {
                     <div><span className="font-bold">Study Center:</span> {result.study_center}</div>
                   </div>
                   <img
-                    src={result.photo_url || PLACEHOLDER_PHOTO}
+                    src={result.photo_url }
                     alt={result.student_name}
                     className="w-20 h-24 border border-slate-300 rounded-md object-cover flex-shrink-0 bg-slate-50"
                   />
